@@ -29,7 +29,7 @@ int main(int argc, char** argv)
     if(!success)
     {
         mathexpr::log_error("Error during expression evaluation");
-        return 0;
+        return 1;
     }
 
     mathexpr::log_info("expr \"{}\" evaluated: ({}) = {}",

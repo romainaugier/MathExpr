@@ -15,8 +15,8 @@ MATHEXPR_NAMESPACE_BEGIN
 
 void SSAStmtVariable::print(std::ostream_iterator<char>& out) const noexcept
 {
-    std::format_to(out, "{}{} = load {} ({}->{})\n", 
-                   VERSION_CHAR, 
+    std::format_to(out, "{}{} = load {} ({}->{})\n",
+                   VERSION_CHAR,
                    this->get_version(),
                    this->_name,
                    this->get_live_range().start,
@@ -25,7 +25,7 @@ void SSAStmtVariable::print(std::ostream_iterator<char>& out) const noexcept
 
 void SSAStmtLiteral::print(std::ostream_iterator<char>& out) const noexcept
 {
-    std::format_to(out, 
+    std::format_to(out,
                    "{}{} = loadi {} ({}->{})\n",
                    VERSION_CHAR,
                    this->get_version(),
@@ -36,7 +36,7 @@ void SSAStmtLiteral::print(std::ostream_iterator<char>& out) const noexcept
 
 void SSAStmtUnOp::print(std::ostream_iterator<char>& out) const noexcept
 {
-    std::format_to(out, 
+    std::format_to(out,
                    "{}{} = {}{}{} ({}->{})\n",
                    VERSION_CHAR,
                    this->get_version(),
@@ -49,7 +49,7 @@ void SSAStmtUnOp::print(std::ostream_iterator<char>& out) const noexcept
 
 void SSAStmtBinOp::print(std::ostream_iterator<char>& out) const noexcept
 {
-    std::format_to(out, 
+    std::format_to(out,
                    "{}{} = {}{} {} {}{} ({}->{})\n",
                    VERSION_CHAR,
                    this->get_version(),
@@ -66,17 +66,17 @@ void SSAStmtFunctionOp::print(std::ostream_iterator<char>& out) const noexcept
 {
     std::string arguments;
 
-    for(const auto [i, arg] : std::views::enumerate(this->_arguments))
+    for(std::size_t i = 0; i < this->_arguments.size(); i++)
     {
-        std::format_to(std::back_inserter(arguments), 
+        std::format_to(std::back_inserter(arguments),
                        "{}{}{}",
                        i == 0 ? "" : ", ",
                        VERSION_CHAR,
-                       arg->get_version());
+                       this->_arguments[i]->get_version());
     }
 
     std::format_to(out,
-                   "{}{} = {}({}) ({}->{})\n", 
+                   "{}{} = {}({}) ({}->{})\n",
                    VERSION_CHAR,
                    this->get_version(),
                    this->_name,
@@ -168,8 +168,10 @@ uint64_t SSAStmtLoadOp::canonicalize() const noexcept
 
 bool SSA::calculate_live_ranges() noexcept
 {
-    for(auto [i, statement]: std::ranges::enumerate_view(this->_statements))
+    for(std::size_t i = 0; i < this->_statements.size(); i++)
     {
+        const SSAStmtPtr statement = this->_statements[i];
+
         statement->get_live_range().start = i;
         statement->get_live_range().end = i + 1;
 
@@ -377,7 +379,7 @@ bool SSA::build_from_ast(const AST& ast) noexcept
                 this->_statements.push_back(funccall);
                 mapping[funccall_node] = funccall;
             }
-            
+
             default:
                 break;
         }

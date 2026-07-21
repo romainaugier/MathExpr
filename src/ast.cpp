@@ -7,6 +7,7 @@
 #include "mathexpr/op.hpp"
 
 #include <format>
+#include <charconv>
 
 MATHEXPR_NAMESPACE_BEGIN
 
@@ -28,8 +29,8 @@ void ASTNodeLiteral::print(std::ostream_iterator<char>& out, size_t indent) cons
 
 void ASTNodeFunctionOp::print(std::ostream_iterator<char>& out, size_t indent) const noexcept
 {
-    std::format_to(out, 
-                   "{}FUNCTION OP: {}({} arguments)\n", 
+    std::format_to(out,
+                   "{}FUNCTION OP: {}({} arguments)\n",
                    std::string(AST::PRINT_INDENT_SIZE * indent, ' '),
                    this->_name,
                    this->_arguments.size());
@@ -190,7 +191,7 @@ public:
                 this->advance();
 
                 std::shared_ptr<ASTNode> expr = this->parse_expression();
-                
+
                 this->advance();
 
                 return expr;
@@ -236,7 +237,7 @@ public:
         {
             const uint32_t op = op_binary_from_string(this->current().data);
 
-            if(op != BinaryOpType_Mul && 
+            if(op != BinaryOpType_Mul &&
                op != BinaryOpType_Div)
             {
                 break;
@@ -267,7 +268,7 @@ public:
         {
             const uint32_t op = op_binary_from_string(this->current().data);
 
-            if(op != BinaryOpType_Add && 
+            if(op != BinaryOpType_Add &&
                op != BinaryOpType_Sub)
             {
                 break;
@@ -283,7 +284,7 @@ public:
             }
 
             left->set_needs_reg(true);
-            
+
             left = std::make_shared<ASTNodeBinaryOp>(left, right, op);
         }
 

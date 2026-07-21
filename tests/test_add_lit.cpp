@@ -1,6 +1,6 @@
-// SPDX-License-Identifier: BSD-3-Clause 
+// SPDX-License-Identifier: BSD-3-Clause
 // Copyright (c) 2025 - Present Romain Augier
-// All rights reserved. 
+// All rights reserved.
 
 #include "mathexpr/log.hpp"
 #include "mathexpr/expr.hpp"
@@ -29,18 +29,16 @@ int main(int argc, char** argv)
     if(!success)
     {
         mathexpr::log_error("Error during expression evaluation");
-        return false;
+        return 1;
     }
 
-    mathexpr::log_info("expr \"{}\" evaluated: ({}) = {}", 
+    mathexpr::log_info("expr \"{}\" evaluated: ({}) = {}",
                         expression,
                         a,
                         res);
 
     if(!DOUBLE_EQ(8.0, res))
-    {
         return 1;
-    }
 
     mathexpr::log_info("Finished add_lit test");
 

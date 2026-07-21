@@ -9,10 +9,9 @@
 
 #if defined(_MSC_VER)
 #define MATHEXPR_MSVC
-#pragma warning(disable : 4711) /* function selected for automatic inline expansion */
 #define _SILENCE_ALL_MS_EXT_DEPRECATION_WARNINGS
 #define _CRT_SECURE_NO_WARNINGS
-#elif defined(__GNUC__)
+#elif defined(__GNUC__) && !defined(__clang__)
 #define MATHEXPR_GCC
 #elif defined(__clang__)
 #define MATHEXPR_CLANG
@@ -45,19 +44,16 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
-
-#if INTPTR_MAX == INT64_MAX || defined(__x86_64__)
-#define MATHEXPR_X64
-#define MATHEXPR_SIZEOF_PTR 8
-#elif INTPTR_MAX == INT32_MAX
-#define MATHEXPR_X86
-#define MATHEXPR_SIZEOF_PTR 4
-#endif /* INTPTR_MAX == INT64_MAX || defined(__x86_64__) */
+#include <cstdlib>
 
 #if defined(__x86_64__)
 #define MATHEXPR_X86_64
+#elif defined(__i386__)
+#defined MATHEXPR_I386
 #elif defined(__aarch64__)
 #define MATHEXPR_AARCH64
+#else
+#error "Unsupported platform"
 #endif /* defined(__x86_64__) */
 
 #if defined(_WIN32)
@@ -68,18 +64,25 @@
 #if !defined(NOMINMAX)
 #define NOMINMAX
 #endif /* !defined(NOMINMAX) */
-#if defined(MATHEXPR_X64)
-#define MATHEXPR_PLATFORM_STR "WIN64"
-#else
-#define MATHEXPR_PLATFORM_STR "WIN32"
+#if defined(MATHEXPR_X86_64)
+#define MATHEXPR_PLATFORM_STR "WINDOWS_X86_64"
+#elif defined(MATHEXPR_I486)
+#define MATHEXPR_PLATFORM_STR "WINDOWS_I386"
 #endif /* defined(MATHEXPR_x64) */
 #elif defined(__linux__)
 #define MATHEXPR_LINUX
-#if defined(MATHEXPR_X64)
-#define MATHEXPR_PLATFORM_STR "LINUX64"
+#if defined(MATHEXPR_X86_64)
+#define MATHEXPR_PLATFORM_STR "LINUX_X86_64"
 #else
-#define MATHEXPR_PLATFORM_STR "LINUX32"
+#define MATHEXPR_PLATFORM_STR "LINUX_X86_64"
 #endif /* defined(MATHEXPR_X64) */
+#elif defined(__APPLE__)
+#define MATHEXPR_APPLE
+#if defined(MATHEXPR_AARCH64)
+#define MATHEXPR_PLATFORM_STR "APPLE_AARCH64"
+#elif defined(MATHEXPR_X86_64)
+#define MATHEXPR_PLATFORM_STR "APPLE_X86_64"
+#endif // defined(MATHEXPR_AARCH64)
 #endif /* defined(_WIN32) */
 
 #if defined(MATHEXPR_WIN)
@@ -90,7 +93,7 @@
 #define MATHEXPR_EXPORT __attribute__((dllexport))
 #define MATHEXPR_IMPORT __attribute__((dllimport))
 #endif /* defined(MATHEXPR_MSVC) */
-#elif defined(MATHEXPR_LINUX)
+#elif defined(MATHEXPR_LINUX) || defined(MATHEXPR_APPLE)
 #define MATHEXPR_EXPORT __attribute__((visibility("default")))
 #define MATHEXPR_IMPORT
 #endif /* defined(MATHEXPR_WIN) */
@@ -99,12 +102,8 @@
 #define MATHEXPR_FORCE_INLINE __forceinline
 #define MATHEXPR_LIB_ENTRY
 #define MATHEXPR_LIB_EXIT
-#elif defined(MATHEXPR_GCC)
+#elif defined(MATHEXPR_GCC) || defined(MATHEXPR_CLANG)
 #define MATHEXPR_FORCE_INLINE inline __attribute__((always_inline))
-#define MATHEXPR_LIB_ENTRY __attribute__((constructor))
-#define MATHEXPR_LIB_EXIT __attribute__((destructor))
-#elif defined(MATHEXPR_CLANG)
-#define MATHEXPR_FORCE_INLINE __attribute__((always_inline))
 #define MATHEXPR_LIB_ENTRY __attribute__((constructor))
 #define MATHEXPR_LIB_EXIT __attribute__((destructor))
 #endif /* defined(MATHEXPR_MSVC) */
@@ -121,21 +120,7 @@
 #define MATHEXPR_API MATHEXPR_IMPORT
 #endif /* defined(MATHEXPR_BUILD_SHARED) */
 
-#if defined __cplusplus
-#define MATHEXPR_CPP_ENTER                                                                        \
-    extern "C"                                                                                     \
-    {
-#define MATHEXPR_CPP_END }
-#else
-#define MATHEXPR_CPP_ENTER
-#define MATHEXPR_CPP_END
-#endif /* DEFINED __cplusplus */
-
-#if !defined NULL
-#define NULL (void*)0
-#endif /* !defined NULL */
-
-#if defined(MATHEXPR_WIN)
+#if defined(MATHEXPR_MSVC)
 #define MATHEXPR_FUNCTION __FUNCTION__
 #elif defined(MATHEXPR_GCC) || defined(MATHEXPR_CLANG)
 #define MATHEXPR_FUNCTION __PRETTY_FUNCTION__
@@ -192,9 +177,7 @@
 #define MATHEXPR_DEBUG 0
 #endif /* defined(DEBUG_BUILD) */
 
-#define MATHEXPR_NAMESPACE_BEGIN                                                                  \
-    namespace mathexpr\
-    {
+#define MATHEXPR_NAMESPACE_BEGIN namespace mathexpr {
 #define MATHEXPR_NAMESPACE_END }
 
 #define MATHEXPR_ATEXIT_REGISTER(func, do_exit)                                                   \

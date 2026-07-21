@@ -269,11 +269,11 @@ Active select_spill_candidate(std::vector<Active>& candidates) noexcept
     uint64_t duration = 0;
     size_t position = 0;
 
-    for(auto [i, candidate] : std::ranges::enumerate_view(candidates))
+    for(std::size_t i = 0; i < candidates.size(); i++)
     {
-        if(candidate.first->get_live_range().get_duration() > duration)
+        if(candidates[i].first->get_live_range().get_duration() > duration)
         {
-            duration = candidate.first->get_live_range().get_duration();
+            duration = candidates[i].first->get_live_range().get_duration();
             position = i;
         }
     }
@@ -476,8 +476,10 @@ bool RegisterAllocator::allocate(SSA& ssa,
 
                     auto& args_registers = this->_platform_abi->get_call_args_fp_registers();
 
-                    for(auto [i, argument] : std::ranges::enumerate_view(funcop->get_arguments()))
+                    for(std::size_t i = 0; i < funcop->get_arguments().size(); i++)
                     {
+                        const SSAStmtPtr argument = funcop->get_arguments()[i];
+
                         this->_mapping[argument] = std::make_shared<Register>(args_registers[i]);
                         actives.emplace_back(argument, args_registers[i]);
                     }
@@ -761,8 +763,10 @@ bool RegisterAllocator::allocate(SSA& ssa,
                         return false;
                     }
 
-                    for(auto [i, arg] : std::ranges::enumerate_view(funcop->get_arguments()))
+                    for(std::size_t i = 0; i < funcop->get_arguments().size(); i++)
                     {
+                        const SSAStmtPtr arg = funcop->get_arguments()[i];
+
                         if(to_spill.contains(arg))
                         {
                             SSAStmtPtr load = std::make_shared<SSAStmtLoadOp>(arg, version++);
