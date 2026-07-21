@@ -160,6 +160,7 @@ bool CodeGenerator::build(const SSA& ssa,
                 {
                     log_error("Internal error during codegen: expected alloc stack op, got: {}",
                               stmt->type_id());
+                    return false;
                 }
 
                 epilogue_stack_size += allocstackop->get_stack_size();
@@ -210,9 +211,7 @@ bool CodeGenerator::build(const SSA& ssa,
     }
 
     if(epilogue_stack_size > 0)
-    {
         this->_instructions.push_back(this->_target_generator->create_epilogue(epilogue_stack_size));
-    }
 
     this->_instructions.push_back(this->_target_generator->create_ret());
 
@@ -230,7 +229,7 @@ std::tuple<bool, ByteCode> CodeGenerator::as_bytecode(Relocations& relocs) const
         instruction->as_bytecode(code);
 
         if(instruction->needs_linking())
-            relocs.emplace_back(std::move(instruction->get_link_info(bytecode_start)));
+            relocs.emplace_back(instruction->get_link_info(bytecode_start));
     }
 
     return std::make_tuple(true, code);
@@ -262,9 +261,7 @@ std::tuple<bool, std::string> CodeGenerator::as_bytecode_hex_string() const noex
         instruction->as_bytecode(tmp);
 
         for(const auto& byte : tmp)
-        {
             std::format_to(std::back_inserter(hexcode), "{}", byte);
-        }
 
         std::format_to(std::back_inserter(hexcode), " ; ");
 
@@ -311,9 +308,7 @@ TargetCodeGeneratorPtr TargetRegistry::create_target(uint32_t isa,
     auto it = registry.find(isa);
 
     if(it == registry.end())
-    {
         return nullptr;
-    }
 
     return it->second(platform_abi);
 }
@@ -326,9 +321,7 @@ std::unordered_set<uint32_t> TargetRegistry::get_supported_isas() noexcept
     isas.reserve(registry.size());
 
     for(const auto& [isa, _] : registry)
-    {
         isas.insert(isa);
-    }
 
     return isas;
 }
@@ -339,10 +332,8 @@ bool TargetRegistry::is_supported(uint32_t isa, PlatformABIPtr platform_abi) noe
 
     auto it = registry.find(isa);
 
-    if (it == registry.end())
-    {
+    if(it == registry.end())
         return false;
-    }
 
     auto target = it->second(platform_abi);
 

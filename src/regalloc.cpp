@@ -710,7 +710,6 @@ bool RegisterAllocator::allocate(SSA& ssa,
                     }
 
                     auto& left = binop->get_left();
-                    auto& right = binop->get_right();
 
                     auto it = to_spill.find(left);
 

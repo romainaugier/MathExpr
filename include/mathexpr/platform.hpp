@@ -18,7 +18,7 @@ enum Platform : uint32_t
 {
     Platform_Windows,
     Platform_Linux,
-    Platform_MacOS,
+    Platform_Apple,
     Platform_Invalid,
 };
 
@@ -90,12 +90,73 @@ enum FpRegisters_x86_64 : RegisterId
 
 enum GpRegisters_aarch64 : RegisterId
 {
-
+    GpRegisters_aarch64_X0,
+    GpRegisters_aarch64_X1,
+    GpRegisters_aarch64_X2,
+    GpRegisters_aarch64_X3,
+    GpRegisters_aarch64_X4,
+    GpRegisters_aarch64_X5,
+    GpRegisters_aarch64_X6,
+    GpRegisters_aarch64_X7,
+    GpRegisters_aarch64_X8,
+    GpRegisters_aarch64_X9,
+    GpRegisters_aarch64_X10,
+    GpRegisters_aarch64_X11,
+    GpRegisters_aarch64_X12,
+    GpRegisters_aarch64_X13,
+    GpRegisters_aarch64_X14,
+    GpRegisters_aarch64_X15,
+    GpRegisters_aarch64_X16,
+    GpRegisters_aarch64_X17,
+    GpRegisters_aarch64_X18,
+    GpRegisters_aarch64_X19,
+    GpRegisters_aarch64_X20,
+    GpRegisters_aarch64_X21,
+    GpRegisters_aarch64_X22,
+    GpRegisters_aarch64_X23,
+    GpRegisters_aarch64_X24,
+    GpRegisters_aarch64_X25,
+    GpRegisters_aarch64_X26,
+    GpRegisters_aarch64_X27,
+    GpRegisters_aarch64_X28,
+    GpRegisters_aarch64_X29,
+    GpRegisters_aarch64_X30,
 };
 
 enum FpRegisters_aarch64 : RegisterId
 {
-
+    FpRegisters_aarch64_V0,
+    FpRegisters_aarch64_V1,
+    FpRegisters_aarch64_V2,
+    FpRegisters_aarch64_V3,
+    FpRegisters_aarch64_V4,
+    FpRegisters_aarch64_V5,
+    FpRegisters_aarch64_V6,
+    FpRegisters_aarch64_V7,
+    FpRegisters_aarch64_V8,
+    FpRegisters_aarch64_V9,
+    FpRegisters_aarch64_V10,
+    FpRegisters_aarch64_V11,
+    FpRegisters_aarch64_V12,
+    FpRegisters_aarch64_V13,
+    FpRegisters_aarch64_V14,
+    FpRegisters_aarch64_V15,
+    FpRegisters_aarch64_V16,
+    FpRegisters_aarch64_V17,
+    FpRegisters_aarch64_V18,
+    FpRegisters_aarch64_V19,
+    FpRegisters_aarch64_V20,
+    FpRegisters_aarch64_V21,
+    FpRegisters_aarch64_V22,
+    FpRegisters_aarch64_V23,
+    FpRegisters_aarch64_V24,
+    FpRegisters_aarch64_V25,
+    FpRegisters_aarch64_V26,
+    FpRegisters_aarch64_V27,
+    FpRegisters_aarch64_V28,
+    FpRegisters_aarch64_V29,
+    FpRegisters_aarch64_V30,
+    FpRegisters_aarch64_V31,
 };
 
 /* registers as string, convenient for pretty printing */

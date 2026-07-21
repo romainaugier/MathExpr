@@ -21,6 +21,15 @@ PlatformABIPtr get_current_platform_abi(uint32_t isa, uint32_t platform) noexcep
                     return std::make_shared<LinuxX64ABI>();
             }
         }
+
+        case ISA_aarch64:
+        {
+            switch(platform)
+            {
+                case Platform_Apple:
+                    return std::make_shared<AppleARM64ABI>();
+            }
+        }
     }
 
     return nullptr;
@@ -157,5 +166,74 @@ const std::vector<RegisterId>& LinuxX64ABI::get_call_args_fp_registers() const n
 
     return regs;
 }
+
+RegisterId AppleARM64ABI::get_variable_base_ptr() const noexcept
+{
+    return GpRegisters_aarch64_X0;
+}
+
+RegisterId AppleARM64ABI::get_literal_base_ptr() const noexcept
+{
+    return GpRegisters_aarch64_X1;
+}
+
+uint64_t AppleARM64ABI::get_max_available_gp_registers() const noexcept
+{
+    return 8;
+}
+
+uint64_t AppleARM64ABI::get_max_available_fp_registers() const noexcept
+{
+    return 8;
+}
+
+RegisterId AppleARM64ABI::get_call_return_value_gp_register() const noexcept
+{
+    return GpRegisters_aarch64_X0;
+}
+
+RegisterId AppleARM64ABI::get_call_return_value_fp_register() const noexcept
+{
+    return FpRegisters_aarch64_V0;
+}
+
+uint64_t AppleARM64ABI::get_call_max_args_gp_registers() const noexcept
+{
+    return 8;
+}
+
+uint64_t AppleARM64ABI::get_call_max_args_fp_registers() const noexcept
+{
+    return 8;
+}
+
+const std::vector<RegisterId>& AppleARM64ABI::get_call_args_gp_registers() const noexcept
+{
+    static const std::vector<RegisterId> regs({ GpRegisters_aarch64_X0,
+                                                GpRegisters_aarch64_X1,
+                                                GpRegisters_aarch64_X2,
+                                                GpRegisters_aarch64_X3,
+                                                GpRegisters_aarch64_X4,
+                                                GpRegisters_aarch64_X5,
+                                                GpRegisters_aarch64_X6,
+                                                GpRegisters_aarch64_X7 });
+
+    return regs;
+}
+
+const std::vector<RegisterId>& AppleARM64ABI::get_call_args_fp_registers() const noexcept
+{
+    static const std::vector<RegisterId> regs({ FpRegisters_aarch64_V0,
+                                                FpRegisters_aarch64_V1,
+                                                FpRegisters_aarch64_V2,
+                                                FpRegisters_aarch64_V3,
+                                                FpRegisters_aarch64_V4,
+                                                FpRegisters_aarch64_V5,
+                                                FpRegisters_aarch64_V6,
+                                                FpRegisters_aarch64_V7 });
+
+    return regs;
+}
+
 
 MATHEXPR_NAMESPACE_END

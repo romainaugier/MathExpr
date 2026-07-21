@@ -26,6 +26,7 @@ enum PlatformABIID : uint32_t
 {
     PlatformABIID_WindowsX64,
     PlatformABIID_LinuxX64,
+    PlatformABIID_AppleARM64,
 };
 
 class MATHEXPR_API PlatformABI
@@ -175,6 +176,58 @@ public:
     virtual RegisterId get_function_call_ptr() const noexcept override { return GpRegisters_x86_64_RAX; }
 
     /* Same as Windows, SysV abi needs 8 bytes to store rbp */
+    virtual uint64_t get_stack_base_offset() const noexcept override { return 8; }
+};
+
+// https://github.com/ARM-software/abi-aa/blob/main/aapcs64/aapcs64.rst#machine-registers
+
+class AppleARM64ABI : public PlatformABI
+{
+public:
+    virtual ~AppleARM64ABI() = default;
+
+    virtual std::string_view get_as_string() const noexcept override { return "Apple ARM64"; }
+
+    virtual uint32_t get_id() const noexcept override { return PlatformABIID_AppleARM64; };
+
+    virtual uint32_t get_target_isa() const noexcept override { return ISA_aarch64; }
+
+    /* X0 */
+    virtual RegisterId get_variable_base_ptr() const noexcept override;
+
+    /* X1 */
+    virtual RegisterId get_literal_base_ptr() const noexcept override;
+
+    /* 29 */
+    virtual uint64_t get_max_available_gp_registers() const noexcept override;
+
+    /* 31 */
+    virtual uint64_t get_max_available_fp_registers() const noexcept override;
+
+    /* X0 */
+    virtual RegisterId get_call_return_value_gp_register() const noexcept override;
+
+    /* V0 */
+    virtual RegisterId get_call_return_value_fp_register() const noexcept override;
+
+    /* 8 */
+    virtual uint64_t get_call_max_args_gp_registers() const noexcept override;
+
+    /* 8 */
+    virtual uint64_t get_call_max_args_fp_registers() const noexcept override;
+
+    /* R0-R7 */
+    virtual const std::vector<RegisterId>& get_call_args_gp_registers() const noexcept override;
+
+    /* V0-V7 */
+    virtual const std::vector<RegisterId>& get_call_args_fp_registers() const noexcept override;
+
+    /* RAX */
+    virtual RegisterId get_function_call_ptr() const noexcept override { return GpRegisters_x86_64_RAX; }
+
+    /* 128 bytes for the stack red zone */
+    virtual uint64_t get_fcall_shadow_space() const noexcept override { return 128; }
+
     virtual uint64_t get_stack_base_offset() const noexcept override { return 8; }
 };
 
