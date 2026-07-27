@@ -6,3 +6,4 @@ compile_flags.txt
 # editors
 .vscode
 .zed
+.cache
