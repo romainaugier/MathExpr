@@ -40,6 +40,14 @@ public:
 
     virtual uint32_t get_target_isa() const noexcept = 0;
 
+    virtual bool can_fold_memory_operand() const noexcept { return false; }
+
+    virtual bool has_two_address_form() const noexcept { return false; }
+
+    virtual bool has_virtual_registers() const noexcept { return false; }
+
+    virtual size_t stack_alignment() const noexcept { return 16; }
+
     /* base ptr for the variables values is passed as the first parameter */
     virtual RegisterId get_variable_base_ptr() const noexcept = 0;
 
@@ -55,6 +63,11 @@ public:
     */
     virtual uint64_t get_max_available_gp_registers() const noexcept = 0;
     virtual uint64_t get_max_available_fp_registers() const noexcept = 0;
+
+    /*
+     * Registers that need to be saved by the caller
+     */
+    virtual const std::vector<RegisterId>& get_caller_saved_fp_registers() const noexcept = 0;
 
     /* Returns the register id of the register used to store the return value of a function call */
     virtual RegisterId get_call_return_value_gp_register() const noexcept = 0;
@@ -90,6 +103,10 @@ public:
 
     virtual uint32_t get_target_isa() const noexcept override { return ISA_x86_64; }
 
+    virtual bool can_fold_memory_operand() const noexcept override { return true; }
+
+    virtual bool has_two_address_form() const noexcept override { return true; }
+
     /* RCX */
     virtual RegisterId get_variable_base_ptr() const noexcept override;
 
@@ -101,6 +118,8 @@ public:
 
     /* Xmm0-Xmm5 */
     virtual uint64_t get_max_available_fp_registers() const noexcept override;
+
+    virtual const std::vector<RegisterId>& get_caller_saved_fp_registers() const noexcept override;
 
     /* RAX */
     virtual RegisterId get_call_return_value_gp_register() const noexcept override;
@@ -142,6 +161,10 @@ public:
 
     virtual uint32_t get_target_isa() const noexcept override { return ISA_x86_64; }
 
+    virtual bool can_fold_memory_operand() const noexcept override { return true; }
+
+    virtual bool has_two_address_form() const noexcept override { return true; }
+
     /* RDI */
     virtual RegisterId get_variable_base_ptr() const noexcept override;
 
@@ -153,6 +176,8 @@ public:
 
     /* 8 */
     virtual uint64_t get_max_available_fp_registers() const noexcept override;
+
+    virtual const std::vector<RegisterId>& get_caller_saved_fp_registers() const noexcept override;
 
     /* RAX */
     virtual RegisterId get_call_return_value_gp_register() const noexcept override;
@@ -203,6 +228,8 @@ public:
 
     /* 31 */
     virtual uint64_t get_max_available_fp_registers() const noexcept override;
+
+    virtual const std::vector<RegisterId>& get_caller_saved_fp_registers() const noexcept override;
 
     /* X0 */
     virtual RegisterId get_call_return_value_gp_register() const noexcept override;

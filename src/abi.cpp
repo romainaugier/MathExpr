@@ -57,6 +57,13 @@ uint64_t WindowsX64ABI::get_max_available_fp_registers() const noexcept
     return 6;
 }
 
+const std::vector<RegisterId>& WindowsX64ABI::get_caller_saved_fp_registers() const noexcept
+{
+    static const std::vector<RegisterId> regs;
+
+    return regs;
+}
+
 RegisterId WindowsX64ABI::get_call_return_value_gp_register() const noexcept
 {
     return GpRegisters_x86_64_RAX;
@@ -119,6 +126,13 @@ uint64_t LinuxX64ABI::get_max_available_gp_registers() const noexcept
 uint64_t LinuxX64ABI::get_max_available_fp_registers() const noexcept
 {
     return 8;
+}
+
+const std::vector<RegisterId>& LinuxX64ABI::get_caller_saved_fp_registers() const noexcept
+{
+    static const std::vector<RegisterId> regs;
+
+    return regs;
 }
 
 RegisterId LinuxX64ABI::get_call_return_value_gp_register() const noexcept
@@ -185,6 +199,13 @@ uint64_t AppleARM64ABI::get_max_available_gp_registers() const noexcept
 uint64_t AppleARM64ABI::get_max_available_fp_registers() const noexcept
 {
     return 8;
+}
+
+const std::vector<RegisterId>& AppleARM64ABI::get_caller_saved_fp_registers() const noexcept
+{
+    static const std::vector<RegisterId> regs;
+
+    return regs;
 }
 
 RegisterId AppleARM64ABI::get_call_return_value_gp_register() const noexcept

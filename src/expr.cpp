@@ -35,7 +35,7 @@ bool Expr::compile(uint64_t debug_flags) noexcept
 
     if(platform == Platform_Invalid)
     {
-        log_error("Current platform is not supported");
+        log_error("Current platform is not supported ({})", platform_as_string(platform));
         return false;
     }
 
@@ -43,7 +43,7 @@ bool Expr::compile(uint64_t debug_flags) noexcept
 
     if(isa == ISA_Invalid)
     {
-        log_error("Current isa is not supported");
+        log_error("Current isa is not supported ({})", isa_as_string(isa));
         return false;
     }
 
@@ -51,7 +51,7 @@ bool Expr::compile(uint64_t debug_flags) noexcept
 
     if(platform_abi == nullptr)
     {
-        log_error("Current ABI is not supported");
+        log_error("Current ABI is not supported ({})", platform_abi->get_as_string());
         return false;
     }
 

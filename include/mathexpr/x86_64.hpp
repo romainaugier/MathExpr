@@ -108,12 +108,12 @@ static const std::unordered_set<std::byte> prefixes = {
 
 class MATHEXPR_API InstrMov : public Instr
 {
-    MemLocPtr _mem_loc_from;
-    MemLocPtr _mem_loc_to;
+    MemLoc _mem_loc_from;
+    MemLoc _mem_loc_to;
 
 public:
-    InstrMov(MemLocPtr& from, MemLocPtr& to) : _mem_loc_from(from),
-                                               _mem_loc_to(to) {}
+    InstrMov(MemLoc& from, MemLoc& to) : _mem_loc_from(from),
+                                         _mem_loc_to(to) {}
 
     virtual void as_string(std::string& out) const noexcept override;
     virtual void as_bytecode(ByteCode& out) const noexcept override;
@@ -145,10 +145,10 @@ public:
 
 class MATHEXPR_API InstrNeg : public Instr
 {
-    MemLocPtr _operand;
+    MemLoc _operand;
 
 public:
-    InstrNeg(MemLocPtr& operand) : _operand(operand) {}
+    InstrNeg(MemLoc& operand) : _operand(operand) {}
 
     virtual void as_string(std::string& out) const noexcept override;
     virtual void as_bytecode(ByteCode& out) const noexcept override;
@@ -158,12 +158,12 @@ public:
 
 class MATHEXPR_API InstrAdd : public Instr
 {
-    MemLocPtr _left;
-    MemLocPtr _right;
+    MemLoc _left;
+    MemLoc _right;
 
 public:
-    InstrAdd(MemLocPtr& left, MemLocPtr& right) : _left(left),
-                                                  _right(right) {}
+    InstrAdd(MemLoc& left, MemLoc& right) : _left(left),
+                                            _right(right) {}
 
     virtual void as_string(std::string& out) const noexcept override;
     virtual void as_bytecode(ByteCode& out) const noexcept override;
@@ -171,12 +171,12 @@ public:
 
 class MATHEXPR_API InstrSub : public Instr
 {
-    MemLocPtr _left;
-    MemLocPtr _right;
+    MemLoc _left;
+    MemLoc _right;
 
 public:
-    InstrSub(MemLocPtr& left, MemLocPtr& right) : _left(left),
-                                                  _right(right) {}
+    InstrSub(MemLoc& left, MemLoc& right) : _left(left),
+                                            _right(right) {}
 
     virtual void as_string(std::string& out) const noexcept override;
     virtual void as_bytecode(ByteCode& out) const noexcept override;
@@ -184,12 +184,12 @@ public:
 
 class MATHEXPR_API InstrMul : public Instr
 {
-    MemLocPtr _left;
-    MemLocPtr _right;
+    MemLoc _left;
+    MemLoc _right;
 
 public:
-    InstrMul(MemLocPtr& left, MemLocPtr& right) : _left(left),
-                                                  _right(right) {}
+    InstrMul(MemLoc& left, MemLoc& right) : _left(left),
+                                            _right(right) {}
 
     virtual void as_string(std::string& out) const noexcept override;
     virtual void as_bytecode(ByteCode& out) const noexcept override;
@@ -197,12 +197,12 @@ public:
 
 class MATHEXPR_API InstrDiv : public Instr
 {
-    MemLocPtr _left;
-    MemLocPtr _right;
+    MemLoc _left;
+    MemLoc _right;
 
 public:
-    InstrDiv(MemLocPtr& left, MemLocPtr& right) : _left(left),
-                                                  _right(right) {}
+    InstrDiv(MemLoc& left, MemLoc& right) : _left(left),
+                                            _right(right) {}
 
     virtual void as_string(std::string& out) const noexcept override;
     virtual void as_bytecode(ByteCode& out) const noexcept override;
@@ -246,14 +246,14 @@ public:
 
     virtual bool is_valid() const noexcept override { return get_current_isa() == ISA_x86_64; }
 
-    virtual InstrPtr create_mov(MemLocPtr& from, MemLocPtr& to) override;
+    virtual InstrPtr create_mov(MemLoc& from, MemLoc& to) override;
     virtual InstrPtr create_prologue(uint64_t stack_size) override;
     virtual InstrPtr create_epilogue(uint64_t stack_size) override;
-    virtual InstrPtr create_neg(MemLocPtr& operand) override;
-    virtual InstrPtr create_add(MemLocPtr& left, MemLocPtr& right) override;
-    virtual InstrPtr create_sub(MemLocPtr& left, MemLocPtr& right) override;
-    virtual InstrPtr create_mul(MemLocPtr& left, MemLocPtr& right) override;
-    virtual InstrPtr create_div(MemLocPtr& left, MemLocPtr& right) override;
+    virtual InstrPtr create_neg(MemLoc& operand) override;
+    virtual InstrPtr create_add(MemLoc& left, MemLoc& right) override;
+    virtual InstrPtr create_sub(MemLoc& left, MemLoc& right) override;
+    virtual InstrPtr create_mul(MemLoc& left, MemLoc& right) override;
+    virtual InstrPtr create_div(MemLoc& left, MemLoc& right) override;
     virtual InstrPtr create_call(std::string_view call_name) override;
     virtual InstrPtr create_ret() override;
 

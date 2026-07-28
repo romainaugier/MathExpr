@@ -54,14 +54,14 @@ public:
 
     virtual bool is_valid() const noexcept = 0;
 
-    virtual InstrPtr create_mov(MemLocPtr& from, MemLocPtr& to) = 0;
+    virtual InstrPtr create_mov(MemLoc& from, MemLoc& to) = 0;
     virtual InstrPtr create_prologue(uint64_t stack_size) = 0;
     virtual InstrPtr create_epilogue(uint64_t stack_size) = 0;
-    virtual InstrPtr create_neg(MemLocPtr& operand) = 0;
-    virtual InstrPtr create_add(MemLocPtr& left, MemLocPtr& right) = 0;
-    virtual InstrPtr create_sub(MemLocPtr& left, MemLocPtr& right) = 0;
-    virtual InstrPtr create_mul(MemLocPtr& left, MemLocPtr& right) = 0;
-    virtual InstrPtr create_div(MemLocPtr& left, MemLocPtr& right) = 0;
+    virtual InstrPtr create_neg(MemLoc& operand) = 0;
+    virtual InstrPtr create_add(MemLoc& left, MemLoc& right) = 0;
+    virtual InstrPtr create_sub(MemLoc& left, MemLoc& right) = 0;
+    virtual InstrPtr create_mul(MemLoc& left, MemLoc& right) = 0;
+    virtual InstrPtr create_div(MemLoc& left, MemLoc& right) = 0;
     virtual InstrPtr create_call(std::string_view call_name) = 0;
     virtual InstrPtr create_ret() = 0;
 

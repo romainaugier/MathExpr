@@ -29,120 +29,48 @@ enum MemLocRegister : uint32_t
     MemLocRegister_Literals,
 };
 
-class MATHEXPR_API MemLoc
+struct MATHEXPR_API MemLoc
 {
-public:
-    virtual ~MemLoc() noexcept {}
+    enum class Kind : uint8_t { Invalid, Register, Stack, Memory };
 
-    virtual void print() const noexcept = 0;
-
-    virtual int type_id() const noexcept = 0;
+    Kind kind = Kind::Invalid;
+    RegisterId reg = INVALID_FP_REGISTER; // Register or base ptr form Memory
+    uint64_t offset = 0;                  // Stack/Memory offset
 };
 
-using MemLocPtr = std::shared_ptr<MemLoc>;
-
-class MATHEXPR_API MemLocInvalid : public MemLoc
+MATHEXPR_FORCE_INLINE MemLoc memloc_register(RegisterId reg) noexcept
 {
-public:
-    virtual void print() const noexcept override {}
-
-    static constexpr int static_type_id() noexcept { return MemLocTypeId_Invalid; }
-
-    virtual int type_id() const noexcept override { return this->static_type_id(); }
-};
-
-class MATHEXPR_API Register : public MemLoc
-{
-    uint32_t _id;
-
-public:
-    Register(uint32_t id) : _id(id) {}
-
-    virtual void print() const noexcept override {}
-
-    static constexpr int static_type_id() noexcept { return MemLocTypeId_Register; }
-
-    virtual int type_id() const noexcept override { return this->static_type_id(); }
-
-    RegisterId get_id() const noexcept { return this->_id; }
-};
-
-class MATHEXPR_API Stack : public MemLoc 
-{
-    uint64_t _offset;
-
-public:
-    Stack(uint64_t offset) : _offset(offset) {}
-
-    virtual void print() const noexcept override {}
-
-    static constexpr int static_type_id() noexcept { return MemLocTypeId_Stack; }
-
-    virtual int type_id() const noexcept override { return this->static_type_id(); }
-
-    uint64_t get_offset() const noexcept { return this->_offset; }
-
-    int64_t get_signed_offset() const noexcept { return -static_cast<int64_t>(this->_offset); }
-};
-
-class MATHEXPR_API Memory : public MemLoc
-{
-    RegisterId _base_ptr; /* RegisterId value where the base ptr is located */
-    uint64_t _offset;
-
-public:
-    Memory(uint64_t base_ptr, uint64_t offset) : _base_ptr(base_ptr), _offset(offset) {}
-
-    virtual void print() const noexcept override {}
-
-    static constexpr int static_type_id() noexcept { return MemLocTypeId_Memory; }
-
-    virtual int type_id() const noexcept override { return this->static_type_id(); }
-
-    RegisterId get_base_ptr_register() const noexcept { return this->_base_ptr; }
-
-    uint64_t get_offset() const noexcept { return this->_offset; }
-};
-
-template<typename T>
-const T* memloc_const_cast(const MemLoc* loc) noexcept
-{
-    if(loc != nullptr && loc->type_id() == T::static_type_id())
-    {
-        return static_cast<const T*>(loc);
-    }
-
-    return nullptr;
+    return { .kind = MemLoc::Kind::Register, .reg = reg };
 }
 
-template<typename T>
-T* memloc_cast(MemLoc* loc) noexcept
+MATHEXPR_FORCE_INLINE MemLoc memloc_stack(uint64_t offset) noexcept
 {
-    if(loc != nullptr && loc->type_id() == T::static_type_id())
-    {
-        return static_cast<T*>(loc);
-    }
+    return { .kind = MemLoc::Kind::Stack, .offset = offset };
+}
 
-    return nullptr;
+MATHEXPR_FORCE_INLINE MemLoc memloc_memory(RegisterId base_ptr, uint64_t offset) noexcept
+{
+    return { .kind = MemLoc::Kind::Memory, .reg = base_ptr, .offset = offset };
 }
 
 class MATHEXPR_API RegisterAllocator
 {
-    std::unordered_map<SSAStmtPtr, MemLocPtr> _mapping;
+    std::unordered_map<SSAStmtPtr, MemLoc> _mapping;
+
     PlatformABIPtr _platform_abi;
 
     static bool prepass_commutative_operand_swap(SSA& ssa) noexcept;
 
-    const MemLocPtr get_reusable_register(const SSAStmtPtr& statement) const noexcept;
+    MemLoc get_reusable_register(const SSAStmtPtr& statement) const noexcept;
 
 public:
     RegisterAllocator(PlatformABIPtr platform_abi) : _platform_abi(platform_abi) {}
 
     bool allocate(SSA& ssa, const SymbolTable& symtable) noexcept;
 
-    MemLocPtr get_memloc(SSAStmtPtr& stmt) const noexcept
+    MemLoc get_memloc(SSAStmtPtr& stmt) const noexcept
     {
-        static MemLocPtr invalid = std::make_shared<MemLocInvalid>();
+        static MemLoc invalid;
 
         auto it = this->_mapping.find(stmt);
 

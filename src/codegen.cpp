@@ -56,12 +56,12 @@ bool CodeGenerator::build(const SSA& ssa,
             {
                 auto variable = statement_cast<SSAStmtVariable>(stmt.get());
 
-                MemLocPtr loc = regalloc.get_memloc(stmt);
+                MemLoc loc = regalloc.get_memloc(stmt);
 
-                if(loc->type_id() == MemLocTypeId_Register)
+                if(loc.kind == MemLoc::Kind::Register)
                 {
-                    MemLocPtr mem = std::make_shared<Memory>(this->_platform_abi->get_variable_base_ptr(),
-                                                             symtable.get_variable_offset(variable->get_name()));
+                    MemLoc mem = memloc_memory(this->_platform_abi->get_variable_base_ptr(),
+                                               symtable.get_variable_offset(variable->get_name()));
 
                     this->_instructions.push_back(this->_target_generator->create_mov(mem, loc));
                 }
@@ -72,12 +72,12 @@ bool CodeGenerator::build(const SSA& ssa,
             {
                 auto literal = statement_cast<SSAStmtLiteral>(stmt.get());
 
-                MemLocPtr loc = regalloc.get_memloc(stmt);
+                MemLoc loc = regalloc.get_memloc(stmt);
 
-                if(loc->type_id() == MemLocTypeId_Register)
+                if(loc.kind == MemLoc::Kind::Register)
                 {
-                    MemLocPtr mem = std::make_shared<Memory>(this->_platform_abi->get_literal_base_ptr(),
-                                                             symtable.get_literal_offset(literal->get_name()));
+                    MemLoc mem = memloc_memory(this->_platform_abi->get_literal_base_ptr(),
+                                               symtable.get_literal_offset(literal->get_name()));
 
                     this->_instructions.push_back(this->_target_generator->create_mov(mem, loc));
                 }
@@ -92,9 +92,9 @@ bool CodeGenerator::build(const SSA& ssa,
             {
                 auto binop = statement_cast<SSAStmtBinOp>(stmt.get());
 
-                MemLocPtr left = regalloc.get_memloc(binop->get_left());
+                MemLoc left = regalloc.get_memloc(binop->get_left());
 
-                if(left == nullptr)
+                if(left.kind == MemLoc::Kind::Invalid)
                 {
                     log_error("Error during codegen. Cannot find location of symbol: {}",
                               binop->get_left()->get_version());
@@ -102,9 +102,9 @@ bool CodeGenerator::build(const SSA& ssa,
                     return false;
                 }
 
-                MemLocPtr right = regalloc.get_memloc(binop->get_right());
+                MemLoc right = regalloc.get_memloc(binop->get_right());
 
-                if(right == nullptr)
+                if(right.kind == MemLoc::Kind::Invalid)
                 {
                     log_error("Error during codegen. Cannot find location of symbol: {}",
                               binop->get_right()->get_version());
@@ -180,8 +180,8 @@ bool CodeGenerator::build(const SSA& ssa,
                     return false;
                 }
 
-                MemLocPtr reg = regalloc.get_memloc(spillop->get_operand());
-                MemLocPtr mem = regalloc.get_memloc(stmt);
+                MemLoc reg = regalloc.get_memloc(spillop->get_operand());
+                MemLoc mem = regalloc.get_memloc(stmt);
 
                 this->_instructions.push_back(this->_target_generator->create_mov(reg, mem));
 
@@ -197,8 +197,8 @@ bool CodeGenerator::build(const SSA& ssa,
                     return false;
                 }
 
-                MemLocPtr reg = regalloc.get_memloc(stmt);
-                MemLocPtr mem = regalloc.get_memloc(loadop->get_spill());
+                MemLoc reg = regalloc.get_memloc(stmt);
+                MemLoc mem = regalloc.get_memloc(loadop->get_spill());
 
                 this->_instructions.push_back(this->_target_generator->create_mov(mem, reg));
 

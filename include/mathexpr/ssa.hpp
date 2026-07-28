@@ -35,12 +35,12 @@ struct LiveRange {
 
     LiveRange(uint64_t start, uint64_t end) : start(start), end(end) {}
 
-    void set_end(uint64_t end) noexcept 
+    void set_end(uint64_t end) noexcept
     {
         this->end = std::max(this->end, end);
     }
 
-    uint64_t get_duration() const noexcept 
+    uint64_t get_duration() const noexcept
     {
         return this->end - this->start;
     }
@@ -56,9 +56,9 @@ class MATHEXPR_API SSAStmt
     uint64_t _frequency;
 
 public:
-    SSAStmt(uint64_t version = INVALID_STMT_VERSION, 
-            uint64_t live_range_start = 0) : _version(version), 
-                                             _range(live_range_start, 
+    SSAStmt(uint64_t version = INVALID_STMT_VERSION,
+            uint64_t live_range_start = 0) : _version(version),
+                                             _range(live_range_start,
                                                     live_range_start),
                                              _register(INVALID_STMT_REGISTER),
                                              _frequency(0) {}
@@ -70,6 +70,10 @@ public:
     virtual uint64_t canonicalize() const noexcept = 0;
 
     virtual int type_id() const noexcept = 0;
+
+    virtual std::vector<std::shared_ptr<SSAStmt>> operands() noexcept { return {}; }
+
+    virtual void replace_operand(size_t idx, std::shared_ptr<SSAStmt> repl) noexcept {}
 
     uint64_t get_version() const noexcept { return this->_version; }
 
@@ -95,9 +99,9 @@ class MATHEXPR_API SSAStmtVariable : public SSAStmt
     std::string_view _name;
 
 public:
-    SSAStmtVariable(std::string_view name, 
+    SSAStmtVariable(std::string_view name,
                     uint64_t version = INVALID_STMT_VERSION,
-                    uint64_t live_range_start = 0) : SSAStmt(version, live_range_start), 
+                    uint64_t live_range_start = 0) : SSAStmt(version, live_range_start),
                                                      _name(name) {}
 
     virtual ~SSAStmtVariable() override {}
@@ -120,7 +124,7 @@ class MATHEXPR_API SSAStmtLiteral : public SSAStmt
 public:
     SSAStmtLiteral(std::string_view name,
                    uint64_t version = INVALID_STMT_VERSION,
-                   uint64_t live_range_start = 0) : SSAStmt(version, live_range_start), 
+                   uint64_t live_range_start = 0) : SSAStmt(version, live_range_start),
                                                     _name(name) {}
 
     virtual ~SSAStmtLiteral() override {}
@@ -146,7 +150,7 @@ public:
     SSAStmtUnOp(SSAStmtPtr operand,
                 uint32_t op,
                 uint64_t version = INVALID_STMT_VERSION,
-                uint64_t live_range_start = 0) : SSAStmt(version, live_range_start), 
+                uint64_t live_range_start = 0) : SSAStmt(version, live_range_start),
                                                  _operand(operand),
                                                  _op(op) {}
 
@@ -159,6 +163,10 @@ public:
     static constexpr int static_type_id() { return 3; }
 
     virtual int type_id() const noexcept override { return this->static_type_id(); }
+
+    virtual std::vector<SSAStmtPtr> operands() noexcept override { return { this->_operand }; }
+
+    virtual void replace_operand(size_t idx, std::shared_ptr<SSAStmt> repl) noexcept override { MATHEXPR_ASSERT(idx == 0, "idx cannot be greater than 0"); this->_operand = repl; }
 
     SSAStmtPtr& get_operand() noexcept { return this->_operand; }
 
@@ -193,6 +201,25 @@ public:
     static constexpr int static_type_id() { return 4; }
 
     virtual int type_id() const noexcept override { return this->static_type_id(); }
+
+    virtual std::vector<SSAStmtPtr> operands() noexcept override { return { this->_left, this->_right }; }
+
+    virtual void replace_operand(size_t idx, std::shared_ptr<SSAStmt> repl) noexcept override
+    {
+        MATHEXPR_ASSERT(idx <= 1, "idx cannot be greater than 1");
+
+        switch(idx)
+        {
+            case 0:
+                this->_left = repl;
+                break;
+            case 1:
+                this->_right = repl;
+                break;
+            default:
+                break;
+        }
+    }
 
     SSAStmtPtr& get_left() noexcept { return this->_left; }
 
@@ -235,10 +262,22 @@ public:
 
     virtual int type_id() const noexcept override { return this->static_type_id(); }
 
+    virtual std::vector<SSAStmtPtr> operands() noexcept override { return this->_arguments; }
+
+    virtual void replace_operand(size_t idx, std::shared_ptr<SSAStmt> repl) noexcept override
+    {
+        MATHEXPR_ASSERT(idx <= this->_arguments.size(), "idx cannot be greater than number of arguments");
+
+        if(idx >= this->_arguments.size())
+            return;
+
+        this->_arguments[idx] = repl;
+    }
+
     std::string_view get_name() const noexcept { return this->_name; }
 
     std::vector<SSAStmtPtr>& get_arguments() noexcept { return this->_arguments; }
-    
+
     const std::vector<SSAStmtPtr>& get_arguments() const noexcept { return this->_arguments; }
 };
 
@@ -285,6 +324,15 @@ public:
 
     virtual int type_id() const noexcept override { return this->static_type_id(); }
 
+    virtual std::vector<SSAStmtPtr> operands() noexcept override { return { this->_operand }; }
+
+    virtual void replace_operand(size_t idx, std::shared_ptr<SSAStmt> repl) noexcept override
+    {
+        MATHEXPR_ASSERT(idx == 0, "idx cannot be greater than 0");
+
+        this->_operand = repl;
+    }
+
     SSAStmtPtr& get_operand() noexcept { return this->_operand; }
 
     const SSAStmtPtr& get_operand() const noexcept { return this->_operand; }
@@ -309,6 +357,15 @@ public:
     static constexpr int static_type_id() { return 8; }
 
     virtual int type_id() const noexcept override { return this->static_type_id(); }
+
+    virtual std::vector<SSAStmtPtr> operands() noexcept override { return { this->_spill }; }
+
+    virtual void replace_operand(size_t idx, std::shared_ptr<SSAStmt> repl) noexcept override
+    {
+        MATHEXPR_ASSERT(idx == 0, "idx cannot be greater than 0");
+
+        this->_spill = repl;
+    }
 
     SSAStmtPtr& get_spill() noexcept { return this->_spill; }
 

@@ -60,14 +60,14 @@ public:
         std::memcpy(this->_data, other._data, SIZE * BYTE_SIZE);
     }
 
-    BitVector operator=(const BitVector& other)
+    BitVector& operator=(const BitVector& other)
     {
         std::memcpy(this->_data, other._data, SIZE * BYTE_SIZE);
 
         return *this;
     }
 
-    BitVector operator=(BitVector&& other) noexcept
+    BitVector& operator=(BitVector&& other) noexcept
     {
         std::memcpy(this->_data, other._data, SIZE * BYTE_SIZE);
 
@@ -108,9 +108,7 @@ public:
 
         /* TODO: use __builtin_clz/BitScanForward per qword */
         while(first < (SIZE * BIT_SIZE) && this->get(first))
-        {
             first++;
-        }
 
         return first;
     }
@@ -122,9 +120,7 @@ public:
 
         /* TODO: use __builtin_ffs/BitScanReverse per qword */
         while(first < (SIZE * BIT_SIZE) && !this->get(first))
-        {
             first++;
-        }
 
         return first;
     }
@@ -139,9 +135,7 @@ public:
         static std::ostream_iterator<char> out(std::cout);
 
         for(size_t i = 0; i < SIZE * BIT_SIZE; i++)
-        {
             std::format_to(out, "{}", this->get(i) ? '1' : '0');
-        }
 
         std::format_to(out, "\n");
     }
@@ -150,13 +144,12 @@ public:
 /* Utilities */
 
 /* Should return a valid register if we can reuse a register to store the result */
-const MemLocPtr RegisterAllocator::get_reusable_register(const SSAStmtPtr& statement) const noexcept
+MemLoc RegisterAllocator::get_reusable_register(const SSAStmtPtr& statement) const noexcept
 {
-    /* Assume that for now, except x86_64, all targets use three-address form (aarch64, nvptx...) */
-    if(this->_platform_abi->get_target_isa() != ISA_x86_64)
-    {
-        return nullptr;
-    }
+    static MemLoc invalid;
+
+    if(!this->_platform_abi->has_two_address_form())
+        return invalid;
 
     switch(statement->type_id())
     {
@@ -165,40 +158,65 @@ const MemLocPtr RegisterAllocator::get_reusable_register(const SSAStmtPtr& state
         {
             auto it = this->_mapping.find(statement);
 
-            return it == this->_mapping.end() ? nullptr : it->second;
+            if(it == this->_mapping.end() || it->second.kind != MemLoc::Kind::Register)
+                return invalid;
+
+            return it->second;
         }
+
         case SSAStmtTypeId_UnOp:
         {
             auto unop = statement_const_cast<SSAStmtUnOp>(statement.get());
 
             auto it = this->_mapping.find(unop->get_operand());
 
-            return it == this->_mapping.end() ? nullptr : it->second;
+            if(it == this->_mapping.end() || it->second.kind != MemLoc::Kind::Register)
+                return invalid;
+
+            return it->second;
         }
+
         case SSAStmtTypeId_BinOp:
         {
             auto binop = statement_const_cast<SSAStmtBinOp>(statement.get());
 
             auto it = this->_mapping.find(binop->get_left());
 
-            return it == this->_mapping.end() ? nullptr : it->second;
+            if(it == this->_mapping.end() || it->second.kind != MemLoc::Kind::Register)
+                return invalid;
+
+            return it->second;
         }
+
         case SSAStmtTypeId_FuncOp:
         {
             auto funcop = statement_const_cast<SSAStmtFunctionOp>(statement.get());
 
             if(funcop->get_arguments().size() == 0)
-            {
-                return nullptr;
-            }
+                return invalid;
 
             auto it = this->_mapping.find(funcop->get_arguments()[0]);
 
-            return it == this->_mapping.end() ? nullptr : it->second;
+            if(it == this->_mapping.end() || it->second.kind != MemLoc::Kind::Register)
+                return invalid;
+
+            return it->second;
+        }
+
+        case SSAStmtTypeId_LoadOp:
+        {
+            auto load = statement_const_cast<SSAStmtLoadOp>(statement.get());
+
+            auto it = this->_mapping.find(load->get_spill());
+
+            if(it == this->_mapping.end() || it->second.kind != MemLoc::Kind::Register)
+                return invalid;
+
+            return it->second;
         }
 
         default:
-            return nullptr;
+            return invalid;
     }
 }
 
@@ -210,48 +228,45 @@ const MemLocPtr RegisterAllocator::get_reusable_register(const SSAStmtPtr& state
 */
 bool RegisterAllocator::prepass_commutative_operand_swap(SSA& ssa) noexcept
 {
-    for(auto& stmt : ssa.get_statements())
-    {
+    auto rank = [](SSAStmtPtr& stmt) -> uint64_t {
         switch(stmt->type_id())
         {
-            case SSAStmtTypeId_BinOp:
+            case SSAStmtTypeId_Literal:
+                return 3;
+            case SSAStmtTypeId_Variable:
+                return 2;
+            case SSAStmtTypeId_SpillOp:
+                return 1;
+            default:
+                return 0;
+        }
+    };
+
+    for(auto& stmt : ssa.get_statements())
+    {
+        if(stmt->type_id() == SSAStmtTypeId_BinOp)
+        {
+            auto binop = statement_cast<SSAStmtBinOp>(stmt.get());
+
+            if(binop == nullptr)
             {
-                auto binop = statement_cast<SSAStmtBinOp>(stmt.get());
+                log_error("Error during commutative operand swap opt pass. Expected binop, got: {}",
+                          stmt->type_id());
 
-                if(binop == nullptr)
-                {
-                    log_error("Error during commutative operand swap opt pass. Expected binop, got: {}",
-                              stmt->type_id());
-                    return false;
-                }
+                return false;
+            }
 
-                if(!op_binary_is_commutative(binop->get_op()))
-                {
-                    break;
-                }
-
-                auto& left = binop->get_left();
-                auto& right = binop->get_right();
-
-                if(left->type_id() == SSAStmtTypeId_Literal &&
-                   right->type_id() != SSAStmtTypeId_Literal)
-                {
-                    binop->swap_operands();
-                }
-
-                if(left->type_id() == SSAStmtTypeId_Variable &&
-                   right->type_id() != SSAStmtTypeId_Variable)
-                {
-                    binop->swap_operands();
-                }
-
-                if(left->type_id() == SSAStmtTypeId_SpillOp &&
-                   right->type_id() != SSAStmtTypeId_SpillOp)
-                {
-                    binop->swap_operands();
-                }
-
+            if(!op_binary_is_commutative(binop->get_op()))
                 break;
+
+            auto& left = binop->get_left();
+            auto& right = binop->get_right();
+
+            if(rank(left) > rank(right))
+            {
+                binop->swap_operands();
+
+                log_debug("Swapped operands of binop: {}{}", VERSION_CHAR, binop->get_version());
             }
         }
     }
@@ -264,19 +279,28 @@ bool RegisterAllocator::prepass_commutative_operand_swap(SSA& ssa) noexcept
 using StackOffset = uint64_t;
 using Active = std::pair<SSAStmtPtr, RegisterId>;
 
-Active select_spill_candidate(std::vector<Active>& candidates) noexcept
+Active select_spill_candidate(std::vector<Active>& candidates,
+                              const std::unordered_set<SSAStmtPtr>& forbidden) noexcept
 {
     uint64_t duration = 0;
     size_t position = 0;
+    bool found = false;
 
     for(std::size_t i = 0; i < candidates.size(); i++)
     {
+        if(forbidden.contains(candidates[i].first))
+            continue;
+
         if(candidates[i].first->get_live_range().get_duration() > duration)
         {
             duration = candidates[i].first->get_live_range().get_duration();
             position = i;
+            found = true;
         }
     }
+
+    if(!found)
+        return std::make_pair(nullptr, 0);
 
     Active candidate = std::move(candidates[position]);
 
@@ -289,6 +313,9 @@ bool RegisterAllocator::allocate(SSA& ssa,
                                  const SymbolTable& symtable) noexcept
 {
     /* multi-pass register allocation using linear scan. we iteratively insert spills/loads */
+
+    constexpr uint32_t max_passes = 64;
+
     uint32_t num_passes = 0;
     uint32_t max_pressure = 0;
     uint64_t needed_stack_size = 0;
@@ -297,6 +324,13 @@ bool RegisterAllocator::allocate(SSA& ssa,
 
     while(true)
     {
+        if(num_passes == max_passes)
+        {
+            log_error("Register allocation did not converge after {} passes", num_passes);
+
+            return false;
+        }
+
         num_passes++;
 
         log_debug("Register allocation: pass {}", num_passes);
@@ -305,81 +339,59 @@ bool RegisterAllocator::allocate(SSA& ssa,
         this->_mapping.clear();
 
         if(!ssa.calculate_live_ranges())
-        {
             return false;
-        }
 
         if(!RegisterAllocator::prepass_commutative_operand_swap(ssa))
-        {
             return false;
-        }
 
         std::vector<Active> actives;
 
         std::vector<SSAStmtPtr>& statements = ssa.get_statements();
 
         /*
-            Allocation of constrained ops: - function calls return in xmm0
-                                           - expr return value in xmm0
-                                           - function args must go in xmm[i]
-                                           - allocate the memory address of each literal
+         *  Allocation of constrained ops:
+         *  - function calls return in r0
+         *  - expr return value in r0
+         *  - function args must go in r[i]
+         *  - allocate the memory address of each literal and variable
+         *  - propagate constraints into previous statements
+         */
 
-        */
-
-        /* We only deal with fp values (double or float) so we only care about this rv */
+        /*
+         * We only deal with fp values (double or float) so we only care about this rv
+         * We set the constraint of return-value register
+         */
         RegisterId rv_reg = this->_platform_abi->get_call_return_value_fp_register();
 
         if(rv_reg == INVALID_FP_REGISTER)
-        {
             return false;
-        }
 
         SSAStmtPtr& last_stmt = statements.back();
 
-        this->_mapping[last_stmt] = std::make_shared<Register>(rv_reg);
+        this->_mapping[last_stmt] = memloc_register(rv_reg);
         actives.emplace_back(last_stmt, rv_reg);
 
         switch(last_stmt->type_id())
         {
             case SSAStmtTypeId_UnOp:
-            {
-                auto unop = statement_cast<SSAStmtUnOp>(last_stmt.get());
-
-                if(unop == nullptr)
-                {
-                    log_error("Error during return value register allocation. Expected unop, got: {}",
-                            last_stmt->type_id());
-                    return false;
-                }
-
-                auto operand = unop->get_operand();
-
-                this->_mapping[operand] = std::make_shared<Register>(rv_reg);
-                actives.emplace_back(operand, rv_reg);
-
-                break;
-            }
-
             case SSAStmtTypeId_BinOp:
             {
-                auto binop = statement_cast<SSAStmtBinOp>(last_stmt.get());
+                this->_mapping[last_stmt] = memloc_register(rv_reg);
+                actives.emplace_back(last_stmt, rv_reg);
 
-                if(binop == nullptr)
+                // We can reuse the first register as the operation is performed on it
+                if(this->_platform_abi->has_two_address_form())
                 {
-                    log_error("Error during return value register allocation. Expected binop, got: {}",
-                            last_stmt->type_id());
-                    return false;
+                    auto operand = last_stmt->operands()[0];
+                    this->_mapping[operand] = memloc_register(rv_reg);
+                    actives.emplace_back(operand, rv_reg);
                 }
-
-                auto left = binop->get_left();
-
-                this->_mapping[left] = std::make_shared<Register>(rv_reg);
-                actives.emplace_back(left, rv_reg);
 
                 break;
             }
         }
 
+        // Propagate constraints to previous statements
         for(int64_t i = statements.size() - 2; i >= 0; i--)
         {
             auto& stmt = statements[i];
@@ -399,12 +411,10 @@ bool RegisterAllocator::allocate(SSA& ssa,
                     }
 
                     if(this->_mapping.contains(stmt))
-                    {
-                        break;
-                    }
+                        continue;
 
-                    this->_mapping[stmt] = std::make_shared<Memory>(this->_platform_abi->get_literal_base_ptr(),
-                                                                    symtable.get_literal_offset(literal->get_name()));
+                    this->_mapping[stmt] = memloc_memory(this->_platform_abi->get_literal_base_ptr(),
+                                                         symtable.get_literal_offset(literal->get_name()));
 
                     break;
                 }
@@ -422,12 +432,10 @@ bool RegisterAllocator::allocate(SSA& ssa,
                     }
 
                     if(this->_mapping.contains(stmt))
-                    {
-                        break;
-                    }
+                        continue;
 
-                    this->_mapping[stmt] = std::make_shared<Memory>(this->_platform_abi->get_variable_base_ptr(),
-                                                                    symtable.get_variable_offset(variable->get_name()));
+                    this->_mapping[stmt] = memloc_memory(this->_platform_abi->get_variable_base_ptr(),
+                                                         symtable.get_variable_offset(variable->get_name()));
 
                     break;
                 }
@@ -446,9 +454,9 @@ bool RegisterAllocator::allocate(SSA& ssa,
 
                     if(this->_mapping.contains(stmt))
                     {
-                        RegisterId reg = memloc_cast<Register>(this->_mapping[stmt].get())->get_id();
+                        RegisterId reg = this->_mapping[stmt].reg;
 
-                        this->_mapping[binop->get_left()] = std::make_shared<Register>(reg);
+                        this->_mapping[binop->get_left()] = memloc_register(reg);
                         actives.emplace_back(binop->get_left(), reg);
                     }
 
@@ -457,7 +465,7 @@ bool RegisterAllocator::allocate(SSA& ssa,
 
                 case SSAStmtTypeId_FuncOp:
                 {
-                    this->_mapping[stmt] = std::make_shared<Register>(rv_reg);
+                    this->_mapping[stmt] = memloc_register(rv_reg);
                     actives.emplace_back(stmt, rv_reg);
 
                     auto funcop = statement_cast<SSAStmtFunctionOp>(stmt.get());
@@ -465,23 +473,22 @@ bool RegisterAllocator::allocate(SSA& ssa,
                     if(funcop == nullptr)
                     {
                         log_error("Internal error during register allocation. Expected func op, got: {}",
-                                stmt->type_id());
+                                  stmt->type_id());
+
                         return false;
                     }
 
                     if(funcop->get_arguments().size() > this->_platform_abi->get_call_max_args_fp_registers())
-                    {
                         return false;
-                    }
 
                     auto& args_registers = this->_platform_abi->get_call_args_fp_registers();
 
-                    for(std::size_t i = 0; i < funcop->get_arguments().size(); i++)
+                    for(std::size_t j = 0; j < funcop->get_arguments().size(); j++)
                     {
-                        const SSAStmtPtr argument = funcop->get_arguments()[i];
+                        const SSAStmtPtr argument = funcop->get_arguments()[j];
 
-                        this->_mapping[argument] = std::make_shared<Register>(args_registers[i]);
-                        actives.emplace_back(argument, args_registers[i]);
+                        this->_mapping[argument] = memloc_register(args_registers[j]);
+                        actives.emplace_back(argument, args_registers[j]);
                     }
 
                     break;
@@ -501,9 +508,9 @@ bool RegisterAllocator::allocate(SSA& ssa,
             return a->get_live_range().start < b->get_live_range().start;
         });
 
-        std::unordered_set<SSAStmtPtr> to_spill;
         uint64_t stack_offset = this->_platform_abi->get_stack_base_offset();
 
+        std::unordered_set<SSAStmtPtr> to_spill;
         std::unordered_set<SSAStmtPtr> to_load;
 
         for(size_t i = 0; i < statements_sorted.size(); i++)
@@ -524,71 +531,33 @@ bool RegisterAllocator::allocate(SSA& ssa,
                 if we need a register for one, load it here
                 TODO: maybe check function ops too
             */
-            switch(stmt->type_id())
+            if(stmt->type_id() == SSAStmtTypeId_UnOp ||
+               stmt->type_id() == SSAStmtTypeId_BinOp ||
+               stmt->type_id() == SSAStmtTypeId_FuncOp)
             {
-                case SSAStmtTypeId_UnOp:
+                for(auto [j, operand] : std::ranges::enumerate_view(stmt->operands()))
                 {
-                    auto unop = statement_cast<SSAStmtUnOp>(stmt.get());
+                    if(this->_platform_abi->can_fold_memory_operand() &&
+                       stmt->type_id() == SSAStmtTypeId_BinOp &&
+                       j == 1)
+                        continue;
 
-                    if(unop == nullptr)
-                    {
-                        log_error("Internal error during register allocation. Expected unop, got: {}",
-                                  stmt->type_id());
-                        return false;
-                    }
-
-                    if(unop->get_operand()->type_id() == SSAStmtTypeId_Literal ||
-                       unop->get_operand()->type_id() == SSAStmtTypeId_Variable)
-                    {
-                        to_load.insert(unop->get_operand());
-                    }
-
-                    break;
-                }
-
-                case SSAStmtTypeId_BinOp:
-                {
-                    auto binop = statement_cast<SSAStmtBinOp>(stmt.get());
-
-                    if(binop == nullptr)
-                    {
-                        log_error("Internal error during register allocation. Expected binop, got: {}",
-                                  stmt->type_id());
-                        return false;
-                    }
-
-                    if(binop->get_left()->type_id() == SSAStmtTypeId_Literal ||
-                       binop->get_left()->type_id() == SSAStmtTypeId_Variable)
-                    {
-                        to_load.insert(binop->get_left());
-                    }
-
-                    break;
+                    if(operand->type_id() == SSAStmtTypeId_Literal ||
+                       operand->type_id() == SSAStmtTypeId_Variable)
+                        to_load.insert(operand);
                 }
             }
 
             if(this->_mapping.contains(stmt))
-            {
                 continue;
-            }
 
             /* Check if we can reuse a register used in the op to store the result */
-            MemLocPtr reusable_register = this->get_reusable_register(stmt);
+            MemLoc reusable_register = this->get_reusable_register(stmt);
 
-            if(reusable_register != nullptr &&
-               reusable_register->type_id() == MemLocTypeId_Register)
+            if(reusable_register.kind == MemLoc::Kind::Register)
             {
-                auto reg = memloc_cast<Register>(reusable_register.get());
-
-                if(reg == nullptr)
-                {
-                    log_error("Internal error during register allocation. Expected register, got: {}",
-                              reusable_register->type_id());
-                    return false;
-                }
-
-                this->_mapping[stmt] = std::make_shared<Register>(reg->get_id());
-                actives.emplace_back(stmt, reg->get_id());
+                this->_mapping[stmt] = memloc_register(reusable_register.reg);
+                actives.emplace_back(stmt, reusable_register.reg);
                 continue;
             }
 
@@ -596,7 +565,7 @@ bool RegisterAllocator::allocate(SSA& ssa,
             {
                 auto spill = statement_cast<SSAStmtSpillOp>(stmt.get());
 
-                this->_mapping[stmt] = std::make_shared<Stack>(stack_offset);
+                this->_mapping[stmt] = memloc_stack(stack_offset);
                 stack_offset += 8;
 
                 needed_stack_size = std::max(needed_stack_size, stack_offset);
@@ -615,9 +584,7 @@ bool RegisterAllocator::allocate(SSA& ssa,
             BitVector used_registers;
 
             for(const auto& [_, reg] : actives)
-            {
                 used_registers.set(reg);
-            }
 
             RegisterId available_register = used_registers.ffz();
 
@@ -626,159 +593,74 @@ bool RegisterAllocator::allocate(SSA& ssa,
             /* Handle spilling */
             if(available_register >= this->_platform_abi->get_max_available_fp_registers())
             {
-                auto [stmt_to_spill, free_reg] = select_spill_candidate(actives);
+                const std::vector<SSAStmtPtr> stmt_operands = stmt->operands();
+
+                std::unordered_set<SSAStmtPtr> forbidden(stmt_operands.begin(), stmt_operands.end());
+
+                for(const auto& [spilled_stmt, _] : spilled)
+                    forbidden.insert(spilled_stmt);
+
+                forbidden.insert(to_spill.begin(), to_spill.end());
+
+                auto [stmt_to_spill, free_reg] = select_spill_candidate(actives, forbidden);
+
+                this->_mapping.erase(stmt_to_spill);
 
                 to_spill.insert(stmt_to_spill);
 
                 available_register = free_reg;
             }
 
-            this->_mapping[stmt] = std::make_shared<Register>(available_register);
+            this->_mapping[stmt] = memloc_register(available_register);
             actives.emplace_back(stmt, available_register);
         }
 
         /* register allocation is successful */
         if(to_spill.size() == 0 && to_load.size() == 0)
-        {
             break;
-        }
 
         std::vector<SSAStmtPtr> new_statements;
         new_statements.reserve(statements.size() + to_spill.size() * 2);
 
         uint64_t version = statements.size();
 
+        /* Check if we need to add loads */
         for(auto stmt : statements)
         {
-            /* Check if we need to add loads */
-            switch(stmt->type_id())
+            for(auto [j, operand] : std::ranges::enumerate_view(stmt->operands()))
             {
-                case SSAStmtTypeId_UnOp:
+                if(this->_platform_abi->can_fold_memory_operand() &&
+                   stmt->type_id() == SSAStmtTypeId_BinOp &&
+                   j == 1)
+                    continue;
+
+                if(to_spill.contains(operand))
                 {
-                    auto unop = statement_cast<SSAStmtUnOp>(stmt.get());
-
-                    if(unop == nullptr)
+                    if(!spilled.contains(operand))
                     {
-                        log_error("Error during load op insertion. Expected unop, got: {}",
-                                  stmt->type_id());
-                        return false;
-                    }
-
-                    auto& operand = unop->get_operand();
-
-                    if(to_spill.contains(operand))
-                    {
-                        if(!spilled.contains(operand))
-                        {
-                            log_error("Error during spilled search. Cannot find spill statement for op: {}",
-                                      operand->get_version());
-                            return false;
-                        }
-
-                        SSAStmtPtr load = std::make_shared<SSAStmtLoadOp>(spilled[operand], version++);
-                        unop->set_operand(load);
-                        new_statements.emplace_back(load);
-
-                        log_debug("Inserted load op for ssa var: {}{}",
-                                  VERSION_CHAR,
+                        log_error("Error during spilled search. Cannot find spill statement for op: {}",
                                   operand->get_version());
-                    }
 
-                    if(to_load.contains(operand))
-                    {
-                        SSAStmtPtr load = std::make_shared<SSAStmtLoadOp>(operand, version++);
-                        unop->set_operand(load);
-                        new_statements.emplace_back(load);
-
-                        log_debug("Inserted load op for ssa var: {}{}",
-                                  VERSION_CHAR,
-                                  operand->get_version());
-                    }
-
-                    break;
-                }
-
-                case SSAStmtTypeId_BinOp:
-                {
-                    auto binop = statement_cast<SSAStmtBinOp>(stmt.get());
-
-                    if(binop == nullptr)
-                    {
-                        log_error("Error during load op insertion. Expected binop, got: {}",
-                                  stmt->type_id());
                         return false;
                     }
 
-                    auto& left = binop->get_left();
+                    SSAStmtPtr load = std::make_shared<SSAStmtLoadOp>(spilled[operand], version++);
+                    stmt->replace_operand(j, load);
+                    new_statements.emplace_back(load);
 
-                    auto it = to_spill.find(left);
-
-                    if(it != to_spill.end())
-                    {
-                        if(!spilled.contains(left))
-                        {
-                            log_error("Error during spilled search. Cannot find spill statement for op: {}",
-                                      left->get_version());
-                            return false;
-                        }
-
-                        SSAStmtPtr load = std::make_shared<SSAStmtLoadOp>(spilled[left], version++);
-                        binop->set_left(load);
-                        new_statements.emplace_back(load);
-
-                        log_debug("Inserted load op for ssa var: {}{}",
-                                  VERSION_CHAR,
-                                  left->get_version());
-                    }
-
-                    if(to_load.contains(left))
-                    {
-                        SSAStmtPtr load = std::make_shared<SSAStmtLoadOp>(left, version++);
-                        binop->set_left(load);
-                        new_statements.emplace_back(load);
-
-                        log_debug("Inserted load op for ssa var: {}{}",
-                                  VERSION_CHAR,
-                                  left->get_version());
-                    }
-
-                    /*
-                        We don't need to load the right operand because it can be used in
-                        immediate mode
-                        We take care of that below, once all registers have been allocated
-                    */
-
-                    break;
+                    log_debug("Inserted load op for ssa var: {}{}",
+                              VERSION_CHAR,
+                              operand->get_version());
                 }
-
-                case SSAStmtTypeId_FuncOp:
+                else if(to_load.contains(operand))
                 {
-                    auto funcop = statement_cast<SSAStmtFunctionOp>(stmt.get());
+                    SSAStmtPtr load = std::make_shared<SSAStmtLoadOp>(operand, version++);
+                    stmt->replace_operand(j, load);
+                    new_statements.emplace_back(load);
 
-                    if(funcop == nullptr)
-                    {
-                        log_error("Error during load op insertion. Expected funcop, got: {}",
-                                  stmt->type_id());
-                        return false;
-                    }
-
-                    for(std::size_t i = 0; i < funcop->get_arguments().size(); i++)
-                    {
-                        const SSAStmtPtr arg = funcop->get_arguments()[i];
-
-                        if(to_spill.contains(arg))
-                        {
-                            SSAStmtPtr load = std::make_shared<SSAStmtLoadOp>(arg, version++);
-                            funcop->get_arguments()[i] = load;
-                            new_statements.emplace_back(load);
-
-                            log_debug("Inserted load op for ssa var: {}{}",
-                                      VERSION_CHAR,
-                                      arg->get_version());
-                        }
-                    }
-
-                    break;
+                    log_debug("Inserted load op for ssa var: {}{}",
+                              VERSION_CHAR,
+                              operand->get_version());
                 }
             }
 
@@ -808,8 +690,9 @@ bool RegisterAllocator::allocate(SSA& ssa,
 
     if(needed_stack_size > 0)
     {
-        /* Stack needs to be aligned to 16 */
-        needed_stack_size = ((needed_stack_size + 15) & ~15);
+        const size_t stack_alignment = this->_platform_abi->stack_alignment() - 1;
+
+        needed_stack_size = ((needed_stack_size + stack_alignment) & ~stack_alignment);
 
         log_debug("Adding stackalloc op (needed space: {})", needed_stack_size);
 

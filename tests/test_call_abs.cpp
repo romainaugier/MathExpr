@@ -33,9 +33,9 @@ int main(int argc, char** argv)
     }
 
     mathexpr::log_info("expr \"{}\" evaluated: ({}) = {}",
-                        expression,
-                        a,
-                        res);
+                       expression,
+                       a,
+                       res);
 
     if(!DOUBLE_EQ(res, 1.0))
         return 1;

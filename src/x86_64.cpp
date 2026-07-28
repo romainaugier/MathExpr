@@ -94,51 +94,43 @@ std::byte encode_platform_fp_register(RegisterId platform_register) noexcept
 }
 
 void memloc_as_string(std::string& out,
-                      const MemLocPtr& memloc) noexcept
+                      const MemLoc& memloc) noexcept
 {
-    switch(memloc->type_id())
+    switch(memloc.kind)
     {
-        case MemLocTypeId_Invalid:
+        case MemLoc::Kind::Invalid:
         {
             std::format_to(std::back_inserter(out), "inv");
             break;
         }
 
-        case MemLocTypeId_Register:
+        case MemLoc::Kind::Register:
         {
-            auto reg = memloc_const_cast<Register>(memloc.get());
-
             std::format_to(std::back_inserter(out),
                            "{}",
-                           fp_register_as_string(reg->get_id(), ISA_x86_64));
+                           fp_register_as_string(memloc.reg, ISA_x86_64));
 
             break;
         }
 
-        case MemLocTypeId_Stack:
+        case MemLoc::Kind::Stack:
         {
             RegisterId stack_register = GpRegisters_x86_64_RBP;
-
-            auto stack = memloc_const_cast<Stack>(memloc.get());
 
             std::format_to(std::back_inserter(out),
                            "[{} - {}]",
                            gp_register_as_string(stack_register, ISA_x86_64),
-                           stack->get_offset());
+                           memloc.offset);
 
             break;
         }
 
-        case MemLocTypeId_Memory:
+        case MemLoc::Kind::Memory:
         {
-            auto mem = memloc_const_cast<Memory>(memloc.get());
-
-            RegisterId regid = mem->get_base_ptr_register();
-
             std::format_to(std::back_inserter(out),
                            "[{} + {}]",
-                           gp_register_as_string(regid, ISA_x86_64),
-                           mem->get_offset());
+                           gp_register_as_string(memloc.reg, ISA_x86_64),
+                           memloc.offset);
 
             break;
         }
@@ -146,44 +138,26 @@ void memloc_as_string(std::string& out,
 }
 
 /* Only useful for fp register since only fp register are used to move to and from */
-std::byte memloc_as_r_byte(const MemLocPtr& memloc) noexcept
+std::byte memloc_as_r_byte(const MemLoc& memloc) noexcept
 {
-    switch(memloc->type_id())
-    {
-        case MemLocTypeId_Register:
-        {
-            auto reg = memloc_const_cast<Register>(memloc.get());
+    if(memloc.kind == MemLoc::Kind::Register)
+        return encode_platform_fp_register(memloc.reg) << 3;
 
-            return encode_platform_fp_register(reg->get_id()) << 3;
-        }
-
-        default:
-            return BYTE(0);
-    }
+    return BYTE(0);
 }
 
-std::byte memloc_as_m_byte(const MemLocPtr& memloc) noexcept
+std::byte memloc_as_m_byte(const MemLoc& memloc) noexcept
 {
-    switch(memloc->type_id())
+    switch(memloc.kind)
     {
-        case MemLocTypeId_Register:
-        {
-            auto reg = memloc_const_cast<Register>(memloc.get());
+        case MemLoc::Kind::Register:
+            return encode_platform_fp_register(memloc.reg);
 
-            return encode_platform_fp_register(reg->get_id());
-        }
-
-        case MemLocTypeId_Stack:
-        {
+        case MemLoc::Kind::Stack:
             return RBP;
-        }
 
-        case MemLocTypeId_Memory:
-        {
-            auto mem = memloc_const_cast<Memory>(memloc.get());
-
-            return encode_platform_gp_register(mem->get_base_ptr_register());
-        }
+        case MemLoc::Kind::Memory:
+            return encode_platform_gp_register(memloc.reg);
 
         default:
             return BYTE(0);
@@ -197,16 +171,16 @@ std::byte encode_sib(uint8_t scale, uint8_t index, uint8_t base) noexcept
 
 using ModRmSibOffset = std::tuple<std::byte, std::optional<std::byte>, std::byte>;
 
-ModRmSibOffset memloc_as_modrm_sib_offset(MemLocPtr from,
-                                          MemLocPtr to) noexcept
+ModRmSibOffset memloc_as_modrm_sib_offset(MemLoc from,
+                                          MemLoc to) noexcept
 {
-    switch(from->type_id())
+    switch(from.kind)
     {
-        case MemLocTypeId_Register:
+        case MemLoc::Kind::Register:
         {
-            switch(to->type_id())
+            switch(to.kind)
             {
-                case MemLocTypeId_Register:
+                case MemLoc::Kind::Register:
                 {
                     const std::byte modrm = x86_64::MOD_DIRECT |
                                             memloc_as_r_byte(to) |
@@ -215,10 +189,8 @@ ModRmSibOffset memloc_as_modrm_sib_offset(MemLocPtr from,
                     return std::make_tuple(modrm, std::nullopt, BYTE(0));
                 }
 
-                case MemLocTypeId_Stack:
+                case MemLoc::Kind::Stack:
                 {
-                    auto stack = memloc_cast<Stack>(to.get());
-
                     const std::byte m_byte = memloc_as_m_byte(to);
 
                     const std::byte modrm = x86_64::MOD_INDIRECT_DISP8 |
@@ -231,37 +203,33 @@ ModRmSibOffset memloc_as_modrm_sib_offset(MemLocPtr from,
                         /* scale=1, index=none (100), base=RSP (100) = 0x24 */
                         const std::byte sib = encode_sib(0, 4, 4);
 
-                        return std::make_tuple(modrm, sib, BYTE(stack->get_offset() - 8));
+                        return std::make_tuple(modrm, sib, BYTE(to.offset - 8));
                     }
 
-                    return std::make_tuple(modrm, std::nullopt, BYTE(stack->get_signed_offset()));
+                    return std::make_tuple(modrm, std::nullopt, BYTE(-static_cast<int64_t>(to.offset)));
                 }
 
-                case MemLocTypeId_Memory:
+                case MemLoc::Kind::Memory:
                 {
-                    auto memory = memloc_cast<Memory>(to.get());
-
-                    const std::byte mod = memory->get_offset() > 0 ? x86_64::MOD_INDIRECT_DISP8 :
-                                                                     x86_64::MOD_INDIRECT;
+                    const std::byte mod = to.offset > 0 ? x86_64::MOD_INDIRECT_DISP8 :
+                                                          x86_64::MOD_INDIRECT;
                     const std::byte modrm = mod |
                                             memloc_as_r_byte(from) |
                                             memloc_as_m_byte(to);
 
-                    return std::make_tuple(modrm, std::nullopt, BYTE(memory->get_offset()));
+                    return std::make_tuple(modrm, std::nullopt, BYTE(to.offset));
                 }
             }
 
             break;
         }
 
-        case MemLocTypeId_Stack:
+        case MemLoc::Kind::Stack:
         {
-            switch(to->type_id())
+            switch(to.kind)
             {
-                case MemLocTypeId_Register:
+                case MemLoc::Kind::Register:
                 {
-                    auto stack = memloc_cast<Stack>(from.get());
-
                     const std::byte m_byte = memloc_as_m_byte(from);
 
                     const std::byte modrm = x86_64::MOD_INDIRECT_DISP8 |
@@ -274,31 +242,29 @@ ModRmSibOffset memloc_as_modrm_sib_offset(MemLocPtr from,
                         /* scale=1, index=none (100), base=RSP (100) = 0x24 */
                         const std::byte sib = encode_sib(0, 4, 4);
 
-                        return std::make_tuple(modrm, sib, BYTE(stack->get_offset() - 8));
+                        return std::make_tuple(modrm, sib, BYTE(from.offset - 8));
                     }
 
-                    return std::make_tuple(modrm, std::nullopt, BYTE(stack->get_signed_offset()));
+                    return std::make_tuple(modrm, std::nullopt, BYTE(-static_cast<int64_t>(from.offset)));
                 }
             }
 
             break;
         }
 
-        case MemLocTypeId_Memory:
+        case MemLoc::Kind::Memory:
         {
-            switch(to->type_id())
+            switch(to.kind)
             {
-                case MemLocTypeId_Register:
+                case MemLoc::Kind::Register:
                 {
-                    auto memory = memloc_cast<Memory>(from.get());
-
-                    const std::byte mod = memory->get_offset() > 0 ? x86_64::MOD_INDIRECT_DISP8 :
-                                                                     x86_64::MOD_INDIRECT;
+                    const std::byte mod = from.offset > 0 ? x86_64::MOD_INDIRECT_DISP8 :
+                                                            x86_64::MOD_INDIRECT;
                     const std::byte modrm = mod |
                                             memloc_as_r_byte(to) |
                                             memloc_as_m_byte(from);
 
-                    return std::make_tuple(modrm, std::nullopt, BYTE(memory->get_offset()));
+                    return std::make_tuple(modrm, std::nullopt, BYTE(from.offset));
                 }
             }
 
@@ -331,14 +297,10 @@ void InstrMov::as_bytecode(ByteCode& out) const noexcept
     out.push_back(BYTE(0xF2)); /* Prefix */
     out.push_back(BYTE(0x0F));
 
-    if(this->_mem_loc_to->type_id() == MemLocTypeId_Register)
-    {
+    if(this->_mem_loc_to.kind == MemLoc::Kind::Register)
         out.push_back(BYTE(0x10));
-    }
     else
-    {
         out.push_back(BYTE(0x11));
-    }
 
     auto [mod_rm_byte, sib, offset] = memloc_as_modrm_sib_offset(this->_mem_loc_from,
                                                                  this->_mem_loc_to);
@@ -346,14 +308,10 @@ void InstrMov::as_bytecode(ByteCode& out) const noexcept
     out.push_back(mod_rm_byte);
 
     if(sib.has_value())
-    {
         out.push_back(sib.value());
-    }
 
     if(modrm_has_displace(mod_rm_byte))
-    {
         out.push_back(offset);
-    }
 }
 
 void InstrPrologue::as_string(std::string& out) const noexcept
@@ -440,14 +398,10 @@ void InstrAdd::as_bytecode(ByteCode& out) const noexcept
     out.push_back(mod_reg_rm_byte);
 
     if(sib.has_value())
-    {
         out.push_back(sib.value());
-    }
 
     if(offset > BYTE(0) || modrm_has_displace(mod_reg_rm_byte))
-    {
         out.push_back(offset);
-    }
 }
 
 void InstrSub::as_string(std::string& out) const noexcept
@@ -470,14 +424,10 @@ void InstrSub::as_bytecode(ByteCode& out) const noexcept
     out.push_back(mod_reg_rm_byte);
 
     if(sib.has_value())
-    {
         out.push_back(sib.value());
-    }
 
     if(offset > BYTE(0) || modrm_has_displace(mod_reg_rm_byte))
-    {
         out.push_back(offset);
-    }
 }
 
 void InstrMul::as_string(std::string& out) const noexcept
@@ -500,14 +450,10 @@ void InstrMul::as_bytecode(ByteCode& out) const noexcept
     out.push_back(mod_reg_rm_byte);
 
     if(sib.has_value())
-    {
         out.push_back(sib.value());
-    }
 
     if(offset > BYTE(0) || modrm_has_displace(mod_reg_rm_byte))
-    {
         out.push_back(offset);
-    }
 }
 
 void InstrDiv::as_string(std::string& out) const noexcept
@@ -530,14 +476,10 @@ void InstrDiv::as_bytecode(ByteCode& out) const noexcept
     out.push_back(mod_reg_rm_byte);
 
     if(sib.has_value())
-    {
         out.push_back(sib.value());
-    }
 
     if(offset > BYTE(0) || modrm_has_displace(mod_reg_rm_byte))
-    {
         out.push_back(offset);
-    }
 }
 
 /* Func ops instructions */
@@ -586,7 +528,7 @@ void InstrRet::as_bytecode(ByteCode& out) const noexcept
 
 X86_64_NAMESPACE_END
 
-InstrPtr X86_64_CodeGenerator::create_mov(MemLocPtr& from, MemLocPtr& to)
+InstrPtr X86_64_CodeGenerator::create_mov(MemLoc& from, MemLoc& to)
 {
     return std::make_shared<x86_64::InstrMov>(from, to);
 }
@@ -601,27 +543,32 @@ InstrPtr X86_64_CodeGenerator::create_epilogue(uint64_t stack_size)
     return std::make_shared<x86_64::InstrEpilogue>(stack_size);
 }
 
-InstrPtr X86_64_CodeGenerator::create_neg(MemLocPtr& operand)
+InstrPtr X86_64_CodeGenerator::create_neg(MemLoc& operand)
 {
     return std::make_shared<x86_64::InstrNeg>(operand);
 }
 
-InstrPtr X86_64_CodeGenerator::create_add(MemLocPtr& left, MemLocPtr& right)
+InstrPtr X86_64_CodeGenerator::create_add(MemLoc& left, MemLoc& right)
 {
     return std::make_shared<x86_64::InstrAdd>(left, right);
 }
 
-InstrPtr X86_64_CodeGenerator::create_sub(MemLocPtr& left, MemLocPtr& right)
+InstrPtr X86_64_CodeGenerator::create_sub(MemLoc& left, MemLoc& right)
 {
     return std::make_shared<x86_64::InstrSub>(left, right);
 }
 
-InstrPtr X86_64_CodeGenerator::create_mul(MemLocPtr& left, MemLocPtr& right)
+InstrPtr X86_64_CodeGenerator::create_mul(MemLoc& left, MemLoc& right)
 {
     return std::make_shared<x86_64::InstrMul>(left, right);
 }
 
-InstrPtr X86_64_CodeGenerator::create_div(MemLocPtr& left, MemLocPtr& right)
+InstrPtr X86_64_CodeGenerator::create_div(MemLoc& left, MemLoc& right)
+
+
+
+
+
 {
     return std::make_shared<x86_64::InstrDiv>(left, right);
 }

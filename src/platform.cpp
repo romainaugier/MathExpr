@@ -35,11 +35,11 @@ const char* platform_as_string(uint32_t platform) noexcept
 
 uint32_t get_current_isa() noexcept
 {
-#if defined(MATHEXPR_X64)
+#if defined(MATHEXPR_X86_64)
     return ISA_x86_64;
 #elif defined(MATHEXPR_AARCH64)
     return ISA_aarch64;
-#endif /* defined(MATHEXPR_X64) */
+#endif /* defined(MATHEXPR_X86_64) */
     return ISA_Invalid;
 }
 
