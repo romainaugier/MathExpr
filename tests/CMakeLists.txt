@@ -13,6 +13,7 @@ foreach(test_file ${TEST_FILES})
     add_executable(${TESTNAME} ${test_file})
     set_target_options(${TESTNAME})
     set_target_properties(${TESTNAME} PROPERTIES CXX_STANDARD 23)
+    target_include_directories(${TESTNAME} ${CMAKE_CURRENT_SOURCE_DIR})
     target_link_libraries(${TESTNAME} ${PROJECT_NAME})
 
     add_test(${TESTNAME} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${TESTNAME})

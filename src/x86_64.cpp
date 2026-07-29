@@ -368,7 +368,8 @@ void InstrEpilogue::as_bytecode(ByteCode& out) const noexcept
 
 void InstrNeg::as_string(std::string& out) const noexcept
 {
-
+    std::format_to(std::back_inserter(out), "");
+    memloc_as_string(out, this->_operand);
 }
 
 void InstrNeg::as_bytecode(ByteCode& out) const noexcept
