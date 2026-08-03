@@ -21,7 +21,7 @@
 
 MATHEXPR_NAMESPACE_BEGIN
 
-class MATHEXPR_API ExecMem 
+class MATHEXPR_API ExecMem
 {
 private:
 
@@ -34,7 +34,7 @@ private:
 #if defined(MATHEXPR_WIN)
         this->_memory = VirtualAlloc(nullptr, _size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 
-        if(this->_memory == nullptr) 
+        if(this->_memory == nullptr)
         {
             log_error("Failed to allocate executable memory");
             return false;
@@ -42,7 +42,7 @@ private:
 #else
         this->_memory = mmap(nullptr, _size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 
-        if(this->_memory == MAP_FAILED) 
+        if(this->_memory == MAP_FAILED)
         {
             log_error("Failed to allocate executable memory");
             return false;
@@ -52,9 +52,9 @@ private:
         return true;
     }
 
-    void deallocate() 
+    void deallocate()
     {
-        if(this->_memory == nullptr) 
+        if(this->_memory == nullptr)
         {
             return;
         }
@@ -71,12 +71,12 @@ public:
 
     ExecMem() : _memory(nullptr), _size(0), _locked(false) {}
 
-    ExecMem(size_t size) : _memory(nullptr), _size(size), _locked(false) 
+    ExecMem(size_t size) : _memory(nullptr), _size(size), _locked(false)
     {
         this->allocate();
     }
 
-    ~ExecMem() 
+    ~ExecMem()
     {
         this->deallocate();
     }
@@ -84,18 +84,18 @@ public:
     ExecMem(const ExecMem&) = delete;
     ExecMem& operator=(const ExecMem&) = delete;
 
-    ExecMem(ExecMem&& other) noexcept : _memory(other._memory), 
-                                        _size(other._size), 
-                                        _locked(other._locked) 
+    ExecMem(ExecMem&& other) noexcept : _memory(other._memory),
+                                        _size(other._size),
+                                        _locked(other._locked)
     {
         other._memory = nullptr;
         other._size = 0;
         other._locked = false;
     }
 
-    ExecMem& operator=(ExecMem&& other) noexcept 
+    ExecMem& operator=(ExecMem&& other) noexcept
     {
-        if(this != &other) 
+        if(this != &other)
         {
             this->deallocate();
             this->_memory = other._memory;
@@ -111,13 +111,13 @@ public:
 
     bool write(const ByteCode& bytecode) noexcept
     {
-        if(this->_locked) 
+        if(this->_locked)
         {
             log_error("Cannot write to locked memory");
             return false;
         }
 
-        if(bytecode.size() > this->_size) 
+        if(bytecode.size() > this->_size)
         {
             log_error("Cannot write to locked memory");
             return false;
@@ -130,21 +130,21 @@ public:
 
     bool lock() noexcept
     {
-        if(this->_locked) 
+        if(this->_locked)
         {
             return true;
         }
-        
+
 #if defined(MATHEXPR_WIN)
         DWORD oldProtect;
 
-        if(!VirtualProtect(this->_memory, this->_size, PAGE_EXECUTE_READ, &oldProtect)) 
+        if(!VirtualProtect(this->_memory, this->_size, PAGE_EXECUTE_READ, &oldProtect))
         {
             log_error("Failed to make memory executable");
             return false;
         }
 #else
-        if(mprotect(this->_memory, this->_size, PROT_READ | PROT_EXEC) != 0) 
+        if(mprotect(this->_memory, this->_size, PROT_READ | PROT_EXEC) != 0)
         {
             log_error("Failed to make memory executable");
             return false;
@@ -157,7 +157,7 @@ public:
 
     FunctionType as_function() const noexcept
     {
-        if(!this->_locked) 
+        if(!this->_locked)
         {
             log_error("ExecMem must be locked before casting to function");
             return nullptr;

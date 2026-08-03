@@ -5,6 +5,7 @@
 #include "mathexpr/regalloc.hpp"
 #include "mathexpr/op.hpp"
 #include "mathexpr/log.hpp"
+#include "mathexpr/enumerate.hpp"
 
 #include <ranges>
 #include <algorithm>
@@ -535,7 +536,7 @@ bool RegisterAllocator::allocate(SSA& ssa,
                stmt->type_id() == SSAStmtTypeId_BinOp ||
                stmt->type_id() == SSAStmtTypeId_FuncOp)
             {
-                for(auto [j, operand] : std::ranges::enumerate_view(stmt->operands()))
+                for(auto [j, operand] : enumerate(stmt->operands()))
                 {
                     if(this->_platform_abi->can_fold_memory_operand() &&
                        stmt->type_id() == SSAStmtTypeId_BinOp &&
@@ -627,7 +628,7 @@ bool RegisterAllocator::allocate(SSA& ssa,
         /* Check if we need to add loads */
         for(auto stmt : statements)
         {
-            for(auto [j, operand] : std::ranges::enumerate_view(stmt->operands()))
+            for(auto [j, operand] : enumerate(stmt->operands()))
             {
                 if(this->_platform_abi->can_fold_memory_operand() &&
                    stmt->type_id() == SSAStmtTypeId_BinOp &&
