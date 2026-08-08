@@ -7,3 +7,14 @@
 static constexpr double EPSILON = 0.00001;
 
 #define DOUBLE_EQ(a, b) ((::fabs(a) - ::fabs(b)) < EPSILON)
+
+#define TEST_CHECK(cond, ...)                                     \
+    do                                                            \
+    {                                                             \
+        if(!(cond))                                               \
+        {                                                         \
+            mathexpr::log_error("CHECK FAILED: " #cond);          \
+            mathexpr::log_error(__VA_ARGS__);                     \
+            std::abort();                                         \
+        }                                                         \
+    } while(0)

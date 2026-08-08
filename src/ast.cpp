@@ -36,9 +36,7 @@ void ASTNodeFunctionOp::print(std::ostream_iterator<char>& out, size_t indent) c
                    this->_arguments.size());
 
     for(const auto& argument : this->_arguments)
-    {
         argument->print(out, indent + 1);
-    }
 }
 
 void ASTNodeUnaryOp::print(std::ostream_iterator<char>& out, size_t indent) const noexcept
@@ -84,14 +82,18 @@ void AST::print() const noexcept
 
 class Parser
 {
+    SlabAllocator& _slab;
+
     const LexerTokens& _tokens;
 
     std::string _error;
 
-    size_t _index;
+    std::size_t _index;
 
 public:
-    Parser(const LexerTokens& tokens) : _tokens(tokens), _index(0) {}
+    Parser(SlabAllocator& slab, const LexerTokens& tokens) : _slab(slab), 
+                                                             _tokens(tokens), 
+                                                             _index(0) {}
 
     MATHEXPR_FORCE_INLINE void advance() noexcept { this->_index++; }
 
@@ -100,9 +102,7 @@ public:
     MATHEXPR_FORCE_INLINE const LexerToken& current() const noexcept
     {
         if(this->is_at_end())
-        {
             return EMPTY_TOKEN;
-        }
 
         return this->_tokens[this->_index];
     }
@@ -110,14 +110,12 @@ public:
     MATHEXPR_FORCE_INLINE const LexerToken& peek() const noexcept
     {
         if(this->_index >= (this->_tokens.size() - 2))
-        {
             return EMPTY_TOKEN;
-        }
 
         return this->_tokens[this->_index + 1];
     }
 
-    std::shared_ptr<ASTNode> parse_factor() noexcept
+    ASTNode* parse_factor() noexcept
     {
         switch(this->current().type)
         {
@@ -136,7 +134,7 @@ public:
 
                 this->advance();
 
-                return std::make_shared<ASTNodeLiteral>(result, lit);
+                return this->_slab.allocate<ASTNodeLiteral>(result, lit);
             }
             case LexerTokenType::Symbol:
             {
@@ -147,16 +145,14 @@ public:
                     this->advance();
                     this->advance();
 
-                    std::vector<std::shared_ptr<ASTNode>> arguments;
+                    std::vector<ASTNode*> arguments;
 
                     if(this->current().type != LexerTokenType::RParen)
                     {
-                        std::shared_ptr<ASTNode> arg = this->parse_expression();
+                        ASTNode* arg = this->parse_expression();
 
                         if(arg == nullptr)
-                        {
                             return nullptr;
-                        }
 
                         arguments.push_back(arg);
 
@@ -167,9 +163,7 @@ public:
                             arg = this->parse_expression();
 
                             if(arg == nullptr)
-                            {
                                 return nullptr;
-                            }
 
                             arguments.emplace_back(arg);
                         }
@@ -177,20 +171,20 @@ public:
 
                     this->advance();
 
-                    return std::make_shared<ASTNodeFunctionOp>(name, std::move(arguments));
+                    return this->_slab.allocate<ASTNodeFunctionOp>(name, std::move(arguments));
                 }
                 else
                 {
                     this->advance();
 
-                    return std::make_shared<ASTNodeVariable>(name);
+                    return this->_slab.allocate<ASTNodeVariable>(name);
                 }
             }
             case LexerTokenType::LParen:
             {
                 this->advance();
 
-                std::shared_ptr<ASTNode> expr = this->parse_expression();
+                ASTNode* expr = this->parse_expression();
 
                 this->advance();
 
@@ -198,7 +192,9 @@ public:
             }
             case LexerTokenType::Operator:
             {
-                if(this->current().data != "-")
+                const std::string_view op_string = this->current().data;
+
+                if(op_string != "-")
                 {
                     std::format_to(std::back_inserter(this->_error),
                                    "Unexpected operator \"{}\" found when parsing unary op",
@@ -209,14 +205,12 @@ public:
 
                 this->advance();
 
-                std::shared_ptr<ASTNode> factor = this->parse_factor();
+                ASTNode* factor = this->parse_factor();
 
                 if(factor == nullptr)
-                {
                     return nullptr;
-                }
 
-                return std::make_shared<ASTNodeUnaryOp>(factor, op_unary_from_string(this->current().data));
+                return this->_slab.allocate<ASTNodeUnaryOp>(factor, op_unary_from_string(op_string));
             }
             default:
             {
@@ -229,63 +223,53 @@ public:
         }
     }
 
-    std::shared_ptr<ASTNode> parse_term() noexcept
+    ASTNode* parse_term() noexcept
     {
-        std::shared_ptr<ASTNode> left = this->parse_factor();
+        ASTNode* left = this->parse_factor();
 
         while(this->current().type == LexerTokenType::Operator)
         {
-            const uint32_t op = op_binary_from_string(this->current().data);
+            const BinaryOpType op = op_binary_from_string(this->current().data);
 
-            if(op != BinaryOpType_Mul &&
-               op != BinaryOpType_Div)
-            {
+            if(op != BinaryOpType::Mul && op != BinaryOpType::Div)
                 break;
-            }
 
             this->advance();
 
-            std::shared_ptr<ASTNode> right = this->parse_factor();
+            ASTNode* right = this->parse_factor();
 
             if(right == nullptr)
-            {
                 return nullptr;
-            }
 
             left->set_needs_reg(true);
 
-            left = std::make_shared<ASTNodeBinaryOp>(left, right, op);
+            left = this->_slab.allocate<ASTNodeBinaryOp>(left, right, op);
         }
 
         return left;
     }
 
-    std::shared_ptr<ASTNode> parse_expression() noexcept
+    ASTNode* parse_expression() noexcept
     {
-        std::shared_ptr<ASTNode> left = this->parse_term();
+        ASTNode* left = this->parse_term();
 
         while(this->current().type == LexerTokenType::Operator)
         {
-            const uint32_t op = op_binary_from_string(this->current().data);
+            const BinaryOpType op = op_binary_from_string(this->current().data);
 
-            if(op != BinaryOpType_Add &&
-               op != BinaryOpType_Sub)
-            {
+            if(op != BinaryOpType::Add && op != BinaryOpType::Sub)
                 break;
-            }
 
             this->advance();
 
-            std::shared_ptr<ASTNode> right = this->parse_term();
+            ASTNode* right = this->parse_term();
 
             if(right == nullptr)
-            {
                 return nullptr;
-            }
 
             left->set_needs_reg(true);
 
-            left = std::make_shared<ASTNodeBinaryOp>(left, right, op);
+            left = this->_slab.allocate<ASTNodeBinaryOp>(left, right, op);
         }
 
         return left;
@@ -294,16 +278,12 @@ public:
 
 bool AST::build_from_tokens(const LexerTokens& tokens) noexcept
 {
-    this->clear();
-
-    Parser parser(tokens);
+    Parser parser(this->_slab, tokens);
 
     this->_root = parser.parse_expression();
 
     if(this->_root == nullptr)
-    {
         return false;
-    }
 
     return true;
 }

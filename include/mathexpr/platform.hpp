@@ -14,30 +14,31 @@
 
 MATHEXPR_NAMESPACE_BEGIN
 
-enum Platform : uint32_t
+enum class Platform : std::uint32_t
 {
-    Platform_Windows,
-    Platform_Linux,
-    Platform_Apple,
-    Platform_Invalid,
+    Windows,
+    Linux,
+    Apple,
+    Invalid,
 };
 
-MATHEXPR_API uint32_t get_current_platform() noexcept;
+MATHEXPR_API Platform get_current_platform() noexcept;
 
-MATHEXPR_API const char* platform_as_string(uint32_t platform) noexcept;
+MATHEXPR_API const char* platform_as_string(Platform platform) noexcept;
 
-enum ISA : uint32_t
+enum class ISA : std::uint32_t
 {
-    ISA_x86_64,
-    ISA_aarch64,
-    ISA_Invalid,
+    x86_64,
+    aarch64,
+    nvptx,
+    Invalid,
 };
 
-MATHEXPR_API uint32_t get_current_isa() noexcept;
+MATHEXPR_API ISA get_current_isa() noexcept;
 
-MATHEXPR_API const char* isa_as_string(uint32_t isa) noexcept;
+MATHEXPR_API const char* isa_as_string(ISA isa) noexcept;
 
-using RegisterId = uint32_t;
+using RegisterId = std::uint32_t;
 
 static constexpr RegisterId INVALID_GP_REGISTER = std::numeric_limits<RegisterId>::max();
 static constexpr RegisterId INVALID_FP_REGISTER = std::numeric_limits<RegisterId>::max();
@@ -76,6 +77,15 @@ enum FpRegisters_x86_64 : RegisterId
     FpRegisters_x86_64_Xmm5,
     FpRegisters_x86_64_Xmm6,
     FpRegisters_x86_64_Xmm7,
+    FpRegisters_x86_64_Xmm8,
+    FpRegisters_x86_64_Xmm9,
+    FpRegisters_x86_64_Xmm10,
+    FpRegisters_x86_64_Xmm11,
+    FpRegisters_x86_64_Xmm12,
+    FpRegisters_x86_64_Xmm13,
+    FpRegisters_x86_64_Xmm14,
+    FpRegisters_x86_64_Xmm15,
+
     FpRegisters_x86_64_Ymm0,
     FpRegisters_x86_64_Ymm1,
     FpRegisters_x86_64_Ymm2,
@@ -84,6 +94,14 @@ enum FpRegisters_x86_64 : RegisterId
     FpRegisters_x86_64_Ymm5,
     FpRegisters_x86_64_Ymm6,
     FpRegisters_x86_64_Ymm7,
+    FpRegisters_x86_64_Ymm8,
+    FpRegisters_x86_64_Ymm9,
+    FpRegisters_x86_64_Ymm10,
+    FpRegisters_x86_64_Ymm11,
+    FpRegisters_x86_64_Ymm12,
+    FpRegisters_x86_64_Ymm13,
+    FpRegisters_x86_64_Ymm14,
+    FpRegisters_x86_64_Ymm15,
 };
 
 /* aarch64 registers */
@@ -160,8 +178,8 @@ enum FpRegisters_aarch64 : RegisterId
 };
 
 /* registers as string, convenient for pretty printing */
-MATHEXPR_API const char* gp_register_as_string(RegisterId reg, uint32_t isa) noexcept;
-MATHEXPR_API const char* fp_register_as_string(RegisterId reg, uint32_t isa) noexcept;
+MATHEXPR_API const char* gp_register_as_string(RegisterId reg, ISA isa) noexcept;
+MATHEXPR_API const char* fp_register_as_string(RegisterId reg, ISA isa) noexcept;
 
 MATHEXPR_NAMESPACE_END
 

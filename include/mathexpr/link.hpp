@@ -18,6 +18,7 @@ enum RelocType : std::uint8_t
 {
     RelocType_Rel32,
     RelocType_Abs64,
+    RelocType_Abs4x16,
 };
 
 /* Information for instructions that need linking */
@@ -26,6 +27,7 @@ struct RelocInfo
     std::string_view symbol_name = "";      /* name of the symbol to link */
     std::size_t bytecode_offset = 0;        /* where to apply reloc in the bytecode */
     RelocType reloc_type = RelocType_Abs64; /* type of reloc */
+    std::size_t instr_offset = 0;           /* offset between instructions to patch (for aarch64) */
 };
 
 using Relocations = std::vector<RelocInfo>;

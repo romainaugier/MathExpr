@@ -6,75 +6,74 @@
 
 MATHEXPR_NAMESPACE_BEGIN
 
-const char* op_unary_to_string(const uint32_t type) noexcept
+const char* op_unary_to_string(const UnaryOpType type) noexcept
 {
     switch(type)
     {
-        case UnaryOpType_Neg:
+        case UnaryOpType::Neg:
             return "-";
+        case UnaryOpType::Abs:
+            return "abs ";
         default:
             return "?";
     }
 }
 
-uint32_t op_unary_from_string(const std::string_view& data) noexcept
+UnaryOpType op_unary_from_string(const std::string_view& data) noexcept
 {
-    if(data == "-")
-    {
-        return UnaryOpType_Neg;
-    }
+    MATHEXPR_ASSERT(data.size() >= 1, "data must contain at least one character");
 
-    return UnaryOpType_Unknown;
+    if(data == "-")
+        return UnaryOpType::Neg;
+
+    if(data == "abs")
+        return UnaryOpType::Abs;
+
+    return UnaryOpType::Unknown;
 }
 
-const char* op_binary_to_string(const uint32_t type) noexcept
+const char* op_binary_to_string(const BinaryOpType type) noexcept
 {
     switch(type)
     {
-        case BinaryOpType_Add: 
+        case BinaryOpType::Add: 
             return "+";
-        case BinaryOpType_Sub: 
+        case BinaryOpType::Sub: 
             return "-";
-        case BinaryOpType_Mul: 
+        case BinaryOpType::Mul: 
             return "*";
-        case BinaryOpType_Div: 
+        case BinaryOpType::Div: 
             return "/";
         default:
             return "?";
     }
 }
 
-uint32_t op_binary_from_string(const std::string_view& data) noexcept
+BinaryOpType op_binary_from_string(const std::string_view& data) noexcept
 {
-    if(data == "+") 
-    {
-        return BinaryOpType_Add;
-    }
-            
-    if(data == "-") 
-    {
-        return BinaryOpType_Sub;
-    }
-            
-    if(data == "*") 
-    {
-        return BinaryOpType_Mul;
-    }
-            
-    if(data == "/") 
-    {
-        return BinaryOpType_Div;
-    }
+    MATHEXPR_ASSERT(data.size() >= 1, "data must contain at least one character");
 
-    return static_cast<uint32_t>(BinaryOpType_Unknown);
+    switch(data[0])
+    {
+        case '+': 
+            return BinaryOpType::Add;
+        case '-': 
+            return BinaryOpType::Sub;
+        case '*': 
+            return BinaryOpType::Mul;
+        case '/': 
+            return BinaryOpType::Div;
+        default:
+            return BinaryOpType::Unknown;
+    }
 }
 
-bool op_binary_is_commutative(const uint32_t type) noexcept
+bool op_binary_is_commutative(const BinaryOpType type) noexcept
 {
     switch(type)
     {
-        case BinaryOpType_Add:
-        case BinaryOpType_Mul:
+        case BinaryOpType::Add:
+        case BinaryOpType::Mul:
             return true;
 
         default:

@@ -15,32 +15,30 @@
 
 MATHEXPR_NAMESPACE_BEGIN
 
-static constexpr size_t INVALID_SYMBOL_ID = std::numeric_limits<size_t>::max();
+static constexpr std::size_t INVALID_SYMBOL_ID = std::numeric_limits<size_t>::max();
 
-static constexpr size_t VALUE_OFFSET = sizeof(double);
+static constexpr std::size_t VALUE_OFFSET = sizeof(double);
 
-static constexpr size_t INVALID_OFFSET = std::numeric_limits<size_t>::max();
+static constexpr std::size_t INVALID_OFFSET = std::numeric_limits<size_t>::max();
 
 class MATHEXPR_API Symbol 
 {
     std::string_view _name;
-    size_t _id;
+    std::size_t _id;
 
 public:
-    Symbol(std::string_view name, size_t id) : _name(std::move(name)), _id(id) {}
+    Symbol(std::string_view name, std::size_t id) : _name(std::move(name)), _id(id) {}
 
     virtual ~Symbol() {}
 
     std::string_view get_name() const noexcept { return this->_name; }
 
-    size_t get_id() const noexcept { return this->_id; }
+    std::size_t get_id() const noexcept { return this->_id; }
 
-    size_t get_offset() const noexcept 
+    std::size_t get_offset() const noexcept 
     { 
         if(!this->valid())
-        {
             return INVALID_OFFSET;
-        }
 
         return this->_id * VALUE_OFFSET;
     }
@@ -87,9 +85,11 @@ public:
 
     void collect(const AST& ast) noexcept;
 
-    size_t get_variable_offset(std::string_view variable_name) const noexcept;
+    std::size_t get_variable_offset(std::string_view variable_name) const noexcept;
 
-    size_t get_literal_offset(std::string_view literal_name) const noexcept;
+    std::size_t get_literal_offset(std::string_view literal_name) const noexcept;
+
+    std::size_t add_literal(std::string_view literal_name, double value) noexcept;
 
     const std::map<std::string_view, SymbolVariable>& get_variables() const noexcept
     {

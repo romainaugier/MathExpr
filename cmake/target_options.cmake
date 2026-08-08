@@ -30,14 +30,17 @@ function(set_target_options target_name)
             -D_FORTIFY_SOURCES=2
             -pipe
             -Wall
+            -Wextra
+            -Wpedantic
             -pedantic-errors
+            $<$<CONFIG:Debug>:-fno-omit-frame-pointer>  
             $<$<CONFIG:Release,RelWithDebInfo>:-O3>
             $<$<CONFIG:Release,RelWithDebInfo>:-Rpass=loop-vectorize>)
 
         if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|amd64")
             list(APPEND COMPILE_OPTIONS -mavx2 -mfma -mveclibabi=svml)
         elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
-            # list(APPEND COMPILE_OPTIONS -march=armv8.2-a+fp16)
+            list(APPEND COMPILE_OPTIONS -march=native)
         endif()
 
         target_compile_options(${target_name} PRIVATE ${COMPILE_OPTIONS})
@@ -68,11 +71,16 @@ function(set_target_options target_name)
             -D_FORTIFY_SOURCES=2
             -pipe
             -Wall
+            -Wextra
+            -Wpedantic
             -pedantic-errors
-            $<$<CONFIG:Release,RelWithDebInfo>:-O3>
-            -mveclibabi=svml
-            -mavx2
-            -mfma)
+            $<$<CONFIG:Release,RelWithDebInfo>:-O3>)
+
+        if(CMAKE_SYSTEM_PROCESSOR MATCHES "x86_64|AMD64|amd64")
+            list(APPEND COMPILE_OPTIONS -mavx2 -mfma -mveclibabi=svml)
+        elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64|arm64|ARM64")
+            list(APPEND COMPILE_OPTIONS -march=native)
+        endif()
 
         target_compile_options(${target_name} PRIVATE ${COMPILE_OPTIONS})
     elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Intel")

@@ -50,41 +50,33 @@ void SymbolTable::clear() noexcept
 
 void SymbolTable::collect(const AST& ast) noexcept
 {
-    size_t variable_id = 0;
-    size_t literal_id = 0;
+    std::size_t variable_id = 0;
+    std::size_t literal_id = 0;
 
     auto pre_order_trav = [&](auto&& self, const ASTNode* current) -> void {
         if(current == nullptr)
-        {
             return;
-        }
 
         auto children = current->get_children();
 
         if(children.has_value())
         {
             for(auto& child : children.value())
-            {
                 self(self, child);
-            }
         }
 
         if(auto current_variable = node_cast<ASTNodeVariable>(current))
         {
             if(!this->_variables.contains(current_variable->get_name()))
-            {
                 this->_variables[current_variable->get_name()] = SymbolVariable(current_variable->get_name(),
                                                                                 variable_id++);
-            }
         }
         else if(auto current_literal = node_cast<ASTNodeLiteral>(current))
         {
             if(!this->_literals.contains(current_literal->get_name()))
-            {
                 this->_literals[current_literal->get_name()] = SymbolLiteral(current_literal->get_value(),
                                                                              current_literal->get_name(),
                                                                              literal_id++);
-            }
         }
         else if(auto current_function_call = node_cast<ASTNodeFunctionOp>(current))
         {
@@ -95,26 +87,34 @@ void SymbolTable::collect(const AST& ast) noexcept
     pre_order_trav(pre_order_trav, ast.get_root());
 }
 
-size_t SymbolTable::get_variable_offset(std::string_view variable_name) const noexcept
+std::size_t SymbolTable::get_variable_offset(std::string_view variable_name) const noexcept
 {
     auto it = this->_variables.find(variable_name);
 
     if(it == this->_variables.end())
-    {
         return INVALID_OFFSET;
-    }
 
     return it->second.get_offset();
 }
 
-size_t SymbolTable::get_literal_offset(std::string_view literal_name) const noexcept
+std::size_t SymbolTable::get_literal_offset(std::string_view literal_name) const noexcept
 {
     auto it = this->_literals.find(literal_name);
 
     if(it == this->_literals.end())
-    {
         return INVALID_OFFSET;
-    }
+
+    return it->second.get_offset();
+}
+
+std::size_t SymbolTable::add_literal(std::string_view literal_name, double value) noexcept
+{
+    auto it = this->_literals.find(literal_name);
+
+    if(it != this->_literals.end())
+        return it->second.get_offset();
+
+    it = this->_literals.emplace(literal_name, SymbolLiteral(value, literal_name, this->_literals.size())).first;
 
     return it->second.get_offset();
 }

@@ -13,6 +13,7 @@
 
 #include <iterator>
 #include <utility>
+#include <functional>
 
 MATHEXPR_NAMESPACE_BEGIN
 
@@ -38,7 +39,7 @@ public:
 
     reference operator*() const noexcept
     {
-        return std::make_pair(this->_idx, std::ref(*this->_iterator));
+        return reference(this->_idx, *this->_iterator);
     }
 
     Enumerator& operator++() noexcept
@@ -119,6 +120,9 @@ EnumeratorWrapper<const Container> enumerate(const Container& container) noexcep
 {
     return EnumeratorWrapper<const Container>(container);
 }
+
+template<typename Container>
+EnumeratorWrapper<const Container> enumerate(const Container&&) = delete;
 
 MATHEXPR_NAMESPACE_END
 

@@ -13,30 +13,31 @@
 
 MATHEXPR_NAMESPACE_BEGIN
 
-enum UnaryOpType : uint32_t
+enum class UnaryOpType : std::uint32_t
 {
-    UnaryOpType_Unknown,
-    UnaryOpType_Neg,
+    Unknown,
+    Neg,
+    Abs,
 };
 
-MATHEXPR_API const char* op_unary_to_string(const uint32_t type) noexcept;
+MATHEXPR_API const char* op_unary_to_string(const UnaryOpType type) noexcept;
 
-MATHEXPR_API uint32_t op_unary_from_string(const std::string_view& data) noexcept;
+MATHEXPR_API UnaryOpType op_unary_from_string(const std::string_view& data) noexcept;
 
-enum BinaryOpType : uint32_t 
+enum class BinaryOpType : std::uint32_t 
 {
-    BinaryOpType_Unknown,
-    BinaryOpType_Add,
-    BinaryOpType_Sub,
-    BinaryOpType_Mul,
-    BinaryOpType_Div,
+    Unknown,
+    Add,
+    Sub,
+    Mul,
+    Div,
 };
 
-MATHEXPR_API const char* op_binary_to_string(const uint32_t type) noexcept;
+MATHEXPR_API const char* op_binary_to_string(const BinaryOpType type) noexcept;
 
-MATHEXPR_API uint32_t op_binary_from_string(const std::string_view& data) noexcept;
+MATHEXPR_API BinaryOpType op_binary_from_string(const std::string_view& data) noexcept;
 
-MATHEXPR_API bool op_binary_is_commutative(const uint32_t type) noexcept;
+MATHEXPR_API bool op_binary_is_commutative(const BinaryOpType type) noexcept;
 
 MATHEXPR_NAMESPACE_END
 

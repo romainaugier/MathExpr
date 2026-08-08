@@ -4,6 +4,7 @@
 
 #include "mathexpr/expr.hpp"
 #include "mathexpr/log.hpp"
+#include "mathexpr/isel.hpp"
 #include "mathexpr/codegen.hpp"
 #include "mathexpr/regalloc.hpp"
 
@@ -29,31 +30,33 @@ std::tuple<bool, double> Expr::_evaluate_internal(const double* values) const no
     return std::make_tuple(true, result);
 }
 
-bool Expr::compile(uint64_t debug_flags) noexcept
+bool Expr::compile(ExprPrintFlags debug_flags) noexcept
 {
-    uint32_t platform = get_current_platform();
+    Platform platform = get_current_platform();
 
-    if(platform == Platform_Invalid)
+    if(platform == Platform::Invalid)
     {
         log_error("Current platform is not supported ({})", platform_as_string(platform));
         return false;
     }
 
-    uint32_t isa = get_current_isa();
+    ISA isa = get_current_isa();
 
-    if(isa == ISA_Invalid)
+    if(isa == ISA::Invalid)
     {
         log_error("Current isa is not supported ({})", isa_as_string(isa));
         return false;
     }
 
-    PlatformABIPtr platform_abi = get_current_platform_abi(isa, platform);
+    const PlatformABI* platform_abi = get_platform_abi(isa, platform);
 
     if(platform_abi == nullptr)
     {
         log_error("Current ABI is not supported ({})", platform_abi->get_as_string());
         return false;
     }
+
+    SlabAllocator allocator{10_Kb};
 
     this->_variables.clear();
     this->_literals.clear();
@@ -69,7 +72,7 @@ bool Expr::compile(uint64_t debug_flags) noexcept
         return false;
     }
 
-    AST ast;
+    AST ast(allocator);
 
     if(!ast.build_from_tokens(tokens))
     {
@@ -78,14 +81,14 @@ bool Expr::compile(uint64_t debug_flags) noexcept
         return false;
     }
 
-    if(debug_flags & ExprPrintFlags_PrintAST)
+    if(debug_flags & ExprPrintFlags::PrintAST)
         ast.print();
 
     SymbolTable symtable;
 
     symtable.collect(ast);
 
-    if(debug_flags & ExprPrintFlags_PrintSymTable)
+    if(debug_flags & ExprPrintFlags::PrintSymTable)
         symtable.print();
 
     /* Variables and literals are stored in order of parsing */
@@ -95,7 +98,7 @@ bool Expr::compile(uint64_t debug_flags) noexcept
     for(auto [_, lit] : symtable.get_literals())
         this->_literals.push_back(lit.get_value());
 
-    SSA ssa;
+    SSA ssa(allocator);
 
     if(!ssa.build_from_ast(ast))
     {
@@ -104,93 +107,30 @@ bool Expr::compile(uint64_t debug_flags) noexcept
         return false;
     }
 
-    if(debug_flags & ExprPrintFlags_PrintSSA)
+    if(debug_flags & ExprPrintFlags::PrintSSA)
         ssa.print();
 
-    RegisterAllocator reg_allocator(platform_abi);
+    const ISel* isel = get_isel(isa);
 
-    if(!reg_allocator.allocate(ssa, symtable))
+    if(isel == nullptr)
     {
-        log_error("Error during register allocation for expression: {}", this->_expr);
+        log_error("Cannot find an Instruction Selector for current isa ({})",
+                  isa_as_string(isa));
+        return false;
+    }
+
+    MIRFunc mir_func;
+
+    if(!isel->lower_ssa_to_mir(ssa, symtable, ScalarType::F64, mir_func))
+    {
+        log_error("Error while selecting instructions for expression: {}", this->_expr);
         log_error("Check the log for more information");
         return false;
     }
 
-    if(debug_flags & ExprPrintFlags_PrintSSARegisterAlloc)
-        ssa.print();
+    mir_func.print();
 
-    CodeGenerator generator(isa, platform_abi);
-
-    if(!generator.build(ssa, reg_allocator, symtable))
-    {
-        log_error("Error while building CodeGenerator for expression: {}", this->_expr);
-        log_error("Check the log for more information");
-        return false;
-    }
-
-    if(debug_flags & ExprPrintFlags_PrintCodeGeneratorAsString)
-    {
-        auto [gen_str_success, code] = generator.as_string();
-
-        if(!gen_str_success)
-        {
-            log_error("Error during code generation for expression: {}", this->_expr);
-            log_error("Check the log for more information");
-
-            return false;
-        }
-
-        std::cout << "CODEGEN\n" << code << "\n";
-    }
-
-    Relocations relocs;
-
-    auto [gen_success, bytecode] = generator.as_bytecode(relocs);
-
-    if(!gen_success)
-    {
-        log_error("Error during bytecode generation for expression: {}", this->_expr);
-        log_error("Check the log for more information");
-        return false;
-    }
-
-    if(debug_flags & ExprPrintFlags_PrintCodeGeneratorRelocations)
-    {
-        std::cout << "RELOCATIONS (" << relocs.size() << ")\n";
-        std::cout << "\n";
-    }
-
-    if(!relocate(bytecode, relocs))
-    {
-        log_error("Error during relocation for expression: {}", this->_expr);
-        log_error("Check the log for more information");
-        return false;
-    }
-
-    if(debug_flags & ExprPrintFlags_PrintCodeGeneratorByteCodeAsHexCode)
-    {
-        std::cout << "BYTECODE" << "\n";
-
-        for(const auto byte : bytecode)
-            std::cout << std::format("{:02x}", static_cast<uint8_t>(byte));
-
-        std::cout << "\n\n";
-    }
-
-    ExecMem exec_mem(bytecode.size() * sizeof(std::byte));
-
-    if(!exec_mem.write(bytecode))
-        return false;
-
-    if(!exec_mem.lock())
-        return false;
-
-    this->_exec_mem = std::move(exec_mem);
-
-    log_debug("Compiled expression: {}", this->_expr);
-    log_debug("Ready to be evaluated");
-
-    return true;
+    return false;
 }
 
 MATHEXPR_NAMESPACE_END

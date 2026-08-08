@@ -45,6 +45,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdlib>
+#include <cstdio>
 
 #if defined(__x86_64__)
 #define MATHEXPR_X86_64
@@ -129,7 +130,7 @@
 #define CONCAT_(prefix, suffix) prefix##suffix
 #define CONCAT(prefix, suffix) CONCAT_(prefix, suffix)
 
-#define MATHEXPR_ASSERT(expr, message)                                                            \
+#define MATHEXPR_ASSERT(expr, message)                                                             \
     if(!(expr))                                                                                    \
     {                                                                                              \
         std::fprintf(stderr,                                                                       \
@@ -141,19 +142,23 @@
     }
 
 #define MATHEXPR_STATIC_ASSERT(expr, message) static_assert(expr, message)
-#define MATHEXPR_NOT_IMPLEMENTED                                                                  \
+#define MATHEXPR_NOT_IMPLEMENTED                                                                   \
     std::fprintf(stderr,                                                                           \
                  "Called function %s that is not implemented (%s:%d)",                             \
-                 MATHEXPR_FUNCTION,                                                               \
+                 MATHEXPR_FUNCTION,                                                                \
                  __FILE__,                                                                         \
                  __LINE__);                                                                        \
     std::exit(1)
 
-#define MATHEXPR_NON_COPYABLE(__class__)                                                          \
+#define MATHEXPR_NON_COPYABLE(__class__)                                                           \
     __class__(const __class__&) = delete;                                                          \
+    const __class__& operator=(const __class__&) = delete;
+
+#define MATHEXPR_NON_MOVABLE(__class__)                                                            \
     __class__(__class__&&) = delete;                                                               \
-    const __class__& operator=(const __class__&) = delete;                                         \
-    void operator=(__class__&&) = delete;
+    const __class__& operator=(__class__&&) = delete;
+
+#define MATHEXPR_UNUSED(expr) (void)(expr)
 
 #if defined(MATHEXPR_MSVC)
 #define MATHEXPR_PACKED_STRUCT(__struct__) __pragma(pack(push, 1)) __struct__ __pragma(pack(pop))

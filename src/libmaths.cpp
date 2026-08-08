@@ -6,6 +6,7 @@
 #include "mathexpr/string_hash.hpp"
 
 #include <cmath>
+#include <array>
 
 MATHEXPR_NAMESPACE_BEGIN
 
@@ -612,77 +613,131 @@ double4 degrees_d4(const double4 x) noexcept
 }
 #endif // defined(MATHEXPR_X86_64)
 
-/* Function table */
+/* Function table and map */
+
+static constexpr std::size_t NUM_FUNCTIONS = static_cast<std::size_t>(FunctionId::COUNT);
 
 #if defined(MATHEXPR_X86_64)
-#define REGISTER_FUNCTION(name, base, arity) \
-    { name, { \
-        reinterpret_cast<void*>(static_cast<Fn##arity##_d>(&base##_d)), \
+#define REGISTER_FUNCTION(base, arity)                                    \
+    {                                                                     \
+        MATHEXPR_STRIFY(base),                                            \
+        reinterpret_cast<void*>(static_cast<Fn##arity##_d>(&base##_d)),   \
         reinterpret_cast<void*>(static_cast<Fn##arity##_d2>(&base##_d2)), \
         reinterpret_cast<void*>(static_cast<Fn##arity##_d4>(&base##_d4)), \
-        arity \
-    } }
+        arity                                                             \
+    }
 #elif defined(MATHEXPR_AARCH64)
-#define REGISTER_FUNCTION(name, base, arity) \
-    { name, { \
-        reinterpret_cast<void*>(static_cast<Fn##arity##_d>(&base##_d)), \
+#define REGISTER_FUNCTION(base, arity)                                    \
+    {                                                                     \
+        MATHEXPR_STRIFY(base),                                            \
+        reinterpret_cast<void*>(static_cast<Fn##arity##_d>(&base##_d)),   \
         reinterpret_cast<void*>(static_cast<Fn##arity##_d2>(&base##_d2)), \
-        arity \
-    } }
+        arity                                                             \
+    } 
 #endif // defined(MATHEXPR_X86_64)
 
-using FuncTable = std::unordered_map<std::string,
-                                     FunctionEntry,
-                                     string_hash,
-                                     std::equal_to<>>;
+using FuncTable = std::array<const FunctionEntry, NUM_FUNCTIONS>;
 
-static const FuncTable g_function_table = {
-    REGISTER_FUNCTION("abs", abs, 1),
-    REGISTER_FUNCTION("sqrt", sqrt, 1),
-    REGISTER_FUNCTION("cbrt", cbrt, 1),
-    REGISTER_FUNCTION("pow", pow, 2),
-    REGISTER_FUNCTION("exp", exp, 1),
-    REGISTER_FUNCTION("expm1", expm1, 1),
-    REGISTER_FUNCTION("log", log, 1),
-    REGISTER_FUNCTION("log10", log10, 1),
-    REGISTER_FUNCTION("log2", log2, 1),
-    REGISTER_FUNCTION("log1p", log1p, 1),
+using FuncMap = std::unordered_map<std::string_view, FunctionId, string_hash, std::equal_to<>>;
 
-    REGISTER_FUNCTION("sin", sin, 1),
-    REGISTER_FUNCTION("cos", cos, 1),
-    REGISTER_FUNCTION("tan", tan, 1),
-    REGISTER_FUNCTION("asin", asin, 1),
-    REGISTER_FUNCTION("acos", acos, 1),
-    REGISTER_FUNCTION("atan", atan, 1),
-    REGISTER_FUNCTION("atan2", atan2, 2),
+static const FuncTable g_function_table = {{
+    REGISTER_FUNCTION(abs, 1),
+    REGISTER_FUNCTION(sqrt, 1),
+    REGISTER_FUNCTION(cbrt, 1),
+    REGISTER_FUNCTION(pow, 2),
+    REGISTER_FUNCTION(exp, 1),
+    REGISTER_FUNCTION(expm1, 1),
+    REGISTER_FUNCTION(log, 1),
+    REGISTER_FUNCTION(log10, 1),
+    REGISTER_FUNCTION(log2, 1),
+    REGISTER_FUNCTION(log1p, 1),
+    REGISTER_FUNCTION(sin, 1),
+    REGISTER_FUNCTION(cos, 1),
+    REGISTER_FUNCTION(tan, 1),
+    REGISTER_FUNCTION(asin, 1),
+    REGISTER_FUNCTION(acos, 1),
+    REGISTER_FUNCTION(atan, 1),
+    REGISTER_FUNCTION(atan2, 2),
+    REGISTER_FUNCTION(sinh, 1),
+    REGISTER_FUNCTION(cosh, 1),
+    REGISTER_FUNCTION(tanh, 1),
+    REGISTER_FUNCTION(asinh, 1),
+    REGISTER_FUNCTION(acosh, 1),
+    REGISTER_FUNCTION(atanh, 1),
+    REGISTER_FUNCTION(floor, 1),
+    REGISTER_FUNCTION(ceil, 1),
+    REGISTER_FUNCTION(trunc, 1),
+    REGISTER_FUNCTION(fmod, 2),
+    REGISTER_FUNCTION(remainder, 2),
+    REGISTER_FUNCTION(copysign, 2),
+    REGISTER_FUNCTION(hypot, 2),
+    REGISTER_FUNCTION(radians, 1),
+    REGISTER_FUNCTION(degrees, 1),
+}};
 
-    REGISTER_FUNCTION("sinh", sinh, 1),
-    REGISTER_FUNCTION("cosh", cosh, 1),
-    REGISTER_FUNCTION("tanh", tanh, 1),
-    REGISTER_FUNCTION("asinh", asinh, 1),
-    REGISTER_FUNCTION("acosh", acosh, 1),
-    REGISTER_FUNCTION("atanh", atanh, 1),
+#define MAP_FUNCTION(name, id) { name, id } 
 
-    REGISTER_FUNCTION("floor", floor, 1),
-    REGISTER_FUNCTION("ceil", ceil, 1),
-    REGISTER_FUNCTION("trunc", trunc, 1),
-    REGISTER_FUNCTION("fmod", fmod, 2),
-    REGISTER_FUNCTION("remainder", remainder, 2),
-    REGISTER_FUNCTION("copysign", copysign, 2),
-
-    REGISTER_FUNCTION("hypot", hypot, 2),
-    REGISTER_FUNCTION("radians", radians, 1),
-    REGISTER_FUNCTION("degrees", degrees, 1),
+static const FuncMap g_function_map = {
+    MAP_FUNCTION("abs", FunctionId::Abs),
+    MAP_FUNCTION("sqrt", FunctionId::Sqrt),
+    MAP_FUNCTION("cbrt", FunctionId::Cbrt),
+    MAP_FUNCTION("pow", FunctionId::Pow),
+    MAP_FUNCTION("exp", FunctionId::Exp),
+    MAP_FUNCTION("expm1", FunctionId::Expm1),
+    MAP_FUNCTION("log", FunctionId::Log),
+    MAP_FUNCTION("log10", FunctionId::Log10),
+    MAP_FUNCTION("log2", FunctionId::Log2),
+    MAP_FUNCTION("log1p", FunctionId::Log1p),
+    MAP_FUNCTION("sin", FunctionId::Sin),
+    MAP_FUNCTION("cos", FunctionId::Cos),
+    MAP_FUNCTION("tan", FunctionId::Tan),
+    MAP_FUNCTION("asin", FunctionId::Asin),
+    MAP_FUNCTION("acos", FunctionId::Acos),
+    MAP_FUNCTION("atan", FunctionId::Atan),
+    MAP_FUNCTION("atan2", FunctionId::Atan2),
+    MAP_FUNCTION("sinh", FunctionId::Sinh),
+    MAP_FUNCTION("cosh", FunctionId::Cosh),
+    MAP_FUNCTION("tanh", FunctionId::Tanh),
+    MAP_FUNCTION("asinh", FunctionId::Asinh),
+    MAP_FUNCTION("acosh", FunctionId::Acosh),
+    MAP_FUNCTION("atanh", FunctionId::Atanh),
+    MAP_FUNCTION("floor", FunctionId::Floor),
+    MAP_FUNCTION("ceil", FunctionId::Ceil),
+    MAP_FUNCTION("trunc", FunctionId::Trunc),
+    MAP_FUNCTION("fmod", FunctionId::Fmod),
+    MAP_FUNCTION("remainder", FunctionId::Remainder),
+    MAP_FUNCTION("copysign", FunctionId::Copysign),
+    MAP_FUNCTION("hypot", FunctionId::Hypot),
+    MAP_FUNCTION("radians", FunctionId::Radians),
+    MAP_FUNCTION("degrees", FunctionId::Degrees),
 };
 
-const FunctionEntry* get_function_entry(const std::string_view& name) noexcept
+FunctionId get_function_id(std::string_view name) noexcept
 {
-    auto entry = g_function_table.find(name);
+    auto entry = g_function_map.find(name);
 
-    if(entry == g_function_table.end())
+    if(entry == g_function_map.end())
+        return FunctionId::Unknown;
+
+    return entry->second;
+}
+
+const FunctionEntry* get_function_entry(std::string_view name) noexcept
+{
+    auto entry = g_function_map.find(name);
+
+    if(entry == g_function_map.end())
         return nullptr;
 
-    return std::addressof(entry->second);
+    return std::addressof(g_function_table[static_cast<std::size_t>(entry->second)]);
+}
+
+const FunctionEntry* get_function_entry(FunctionId id) noexcept
+{
+    if(id >= FunctionId::COUNT)
+        return nullptr;
+
+    return std::addressof(g_function_table[static_cast<std::size_t>(id)]);
 }
 
 LIBMATHS_NAMESPACE_END

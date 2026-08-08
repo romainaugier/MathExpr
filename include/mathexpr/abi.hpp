@@ -5,12 +5,12 @@
 #pragma once
 
 #if !defined(__MATHEXPR_ABI)
-#define __MATHEXPRABI_
+#define __MATHEXPR_ABI
 
 #include "mathexpr/platform.hpp"
-#include "mathexpr/bytecode.hpp"
 
-#include <memory>
+#include <span>
+#include <string_view>
 
 /*
     ABIs
@@ -18,15 +18,18 @@
     https://www.thejat.in/learn/system-v-amd64-calling-convention
     https://learn.microsoft.com/en-us/cpp/build/x64-software-conventions?view=msvc-170#x64-register-usage
     https://developer.apple.com/documentation/xcode/writing-arm64-code-for-apple-platforms
+    https://github.com/ARM-software/abi-aa/blob/main/aapcs64/aapcs64.rst#machine-registers
+    https://docs.nvidia.com/cuda/ptx-writers-guide-to-interoperability/index.html
 */
 
 MATHEXPR_NAMESPACE_BEGIN
 
-enum PlatformABIID : uint32_t
+enum PlatformABIID : std::uint32_t
 {
     PlatformABIID_WindowsX64,
     PlatformABIID_LinuxX64,
     PlatformABIID_AppleARM64,
+    PlatformABIID_NvPTX,
 };
 
 class MATHEXPR_API PlatformABI
@@ -36,9 +39,9 @@ public:
 
     virtual std::string_view get_as_string() const noexcept = 0;
 
-    virtual uint32_t get_id() const noexcept = 0;
+    virtual std::uint32_t get_id() const noexcept = 0;
 
-    virtual uint32_t get_target_isa() const noexcept = 0;
+    virtual ISA get_target_isa() const noexcept = 0;
 
     virtual bool can_fold_memory_operand() const noexcept { return false; }
 
@@ -46,216 +49,207 @@ public:
 
     virtual bool has_virtual_registers() const noexcept { return false; }
 
-    virtual size_t stack_alignment() const noexcept { return 16; }
+    virtual std::uint64_t stack_alignment() const noexcept { return 16; }
 
-    /* base ptr for the variables values is passed as the first parameter */
+    /* base ptr for the variables values, passed as the first parameter */
     virtual RegisterId get_variable_base_ptr() const noexcept = 0;
 
-    /* base ptr for the variables values is passed as the second parameter */
+    /* base ptr for the literals values, passed as the second parameter */
     virtual RegisterId get_literal_base_ptr() const noexcept = 0;
 
-    /* register used to pass the address of a function when doing a function call */
+    /* scratch register used to hold the target address of an indirect call */
     virtual RegisterId get_function_call_ptr() const noexcept = 0;
 
     /*
-        Returns the maximum number of registers that can be used simultaneously, used by
-        the register allocator to know how many registers we can use
+        Register allocation priority lists. Caller-saved registers come first,
+        callee-saved registers are appended at the end so the register allocator
+        only uses them when spilling would otherwise be required.
     */
-    virtual uint64_t get_max_available_gp_registers() const noexcept = 0;
-    virtual uint64_t get_max_available_fp_registers() const noexcept = 0;
+    virtual std::span<const RegisterId> get_gp_allocatable_registers() const noexcept = 0;
+    virtual std::span<const RegisterId> get_fp_allocatable_registers() const noexcept = 0;
 
-    /*
-     * Registers that need to be saved by the caller
-     */
-    virtual const std::vector<RegisterId>& get_caller_saved_fp_registers() const noexcept = 0;
+    /* Registers clobbered by a call (subset of the allocatable lists) */
+    virtual std::span<const RegisterId> get_caller_saved_gp_registers() const noexcept = 0;
+    virtual std::span<const RegisterId> get_caller_saved_fp_registers() const noexcept = 0;
 
-    /* Returns the register id of the register used to store the return value of a function call */
+    /* Registers the prologue must save if the allocator ends up using them */
+    virtual std::span<const RegisterId> get_callee_saved_gp_registers() const noexcept = 0;
+    virtual std::span<const RegisterId> get_callee_saved_fp_registers() const noexcept = 0;
+
+    /* Registers used to return a value from a call */
     virtual RegisterId get_call_return_value_gp_register() const noexcept = 0;
     virtual RegisterId get_call_return_value_fp_register() const noexcept = 0;
 
-    /* Returns the number of registers we can use to store arguments for a function call */
-    virtual uint64_t get_call_max_args_gp_registers() const noexcept = 0;
-    virtual uint64_t get_call_max_args_fp_registers() const noexcept = 0;
+    /* Registers used to pass arguments to a call, in argument order */
+    virtual std::span<const RegisterId> get_call_args_gp_registers() const noexcept = 0;
+    virtual std::span<const RegisterId> get_call_args_fp_registers() const noexcept = 0;
 
-    /* Returns the register order for arguments placement before a function call */
-    virtual const std::vector<RegisterId>& get_call_args_gp_registers() const noexcept = 0;
-    virtual const std::vector<RegisterId>& get_call_args_fp_registers() const noexcept = 0;
+    /* Outgoing-args shadow space the callee may rely on (Win64: 32 bytes) */
+    virtual std::uint64_t get_call_shadow_space_size() const noexcept { return 0; }
 
-    /* Returns the size of the stack shadow space to allocate for function calls */
-    virtual uint64_t get_fcall_shadow_space() const noexcept { return 0; }
+    /* Bytes below SP a leaf function may use without adjusting SP (SysV/AAPCS64 red zone) */
+    virtual std::uint64_t get_stack_red_zone_size() const noexcept { return 0; }
 
-    /* Returns the offset of the stack base where we can start storing spills */
-    virtual uint64_t get_stack_base_offset() const noexcept { return 0; }
+    /* Offset from the frame base where spill slots start */
+    virtual std::uint64_t get_stack_base_offset() const noexcept { return 0; }
 };
 
-using PlatformABIPtr = std::shared_ptr<PlatformABI>;
+const PlatformABI* get_platform_abi(ISA isa = get_current_isa(),
+                                    Platform platform = get_current_platform()) noexcept;
 
-PlatformABIPtr get_current_platform_abi(uint32_t isa, uint32_t platform) noexcept;
-
-class WindowsX64ABI : public PlatformABI
+class MATHEXPR_API WindowsX64ABI : public PlatformABI
 {
 public:
     virtual ~WindowsX64ABI() = default;
 
-    virtual std::string_view get_as_string() const noexcept override { return "Windows x64"; }
+    virtual std::string_view get_as_string() const noexcept override;
 
-    virtual uint32_t get_id() const noexcept override { return PlatformABIID_WindowsX64; };
+    virtual std::uint32_t get_id() const noexcept override;
 
-    virtual uint32_t get_target_isa() const noexcept override { return ISA_x86_64; }
+    virtual ISA get_target_isa() const noexcept override;
 
-    virtual bool can_fold_memory_operand() const noexcept override { return true; }
+    virtual bool can_fold_memory_operand() const noexcept override;
 
-    virtual bool has_two_address_form() const noexcept override { return true; }
+    virtual bool has_two_address_form() const noexcept override;
 
-    /* RCX */
     virtual RegisterId get_variable_base_ptr() const noexcept override;
 
-    /* RDX */
     virtual RegisterId get_literal_base_ptr() const noexcept override;
 
-    /* 4 */
-    virtual uint64_t get_max_available_gp_registers() const noexcept override;
+    virtual RegisterId get_function_call_ptr() const noexcept override;
 
-    /* Xmm0-Xmm5 */
-    virtual uint64_t get_max_available_fp_registers() const noexcept override;
+    virtual std::span<const RegisterId> get_gp_allocatable_registers() const noexcept override;
+    virtual std::span<const RegisterId> get_fp_allocatable_registers() const noexcept override;
 
-    virtual const std::vector<RegisterId>& get_caller_saved_fp_registers() const noexcept override;
+    virtual std::span<const RegisterId> get_caller_saved_gp_registers() const noexcept override;
+    virtual std::span<const RegisterId> get_caller_saved_fp_registers() const noexcept override;
 
-    /* RAX */
+    virtual std::span<const RegisterId> get_callee_saved_gp_registers() const noexcept override;
+    virtual std::span<const RegisterId> get_callee_saved_fp_registers() const noexcept override;
+
     virtual RegisterId get_call_return_value_gp_register() const noexcept override;
-
-    /* Xmm0 */
     virtual RegisterId get_call_return_value_fp_register() const noexcept override;
 
-    /* RCX, RDX, R8, R9 */
-    virtual uint64_t get_call_max_args_gp_registers() const noexcept override;
+    virtual std::span<const RegisterId> get_call_args_gp_registers() const noexcept override;
+    virtual std::span<const RegisterId> get_call_args_fp_registers() const noexcept override;
 
-    /* Xmm0-Xmm3 if __fastcall, Xmm0-Xmm5 if __vectorcall */
-    virtual uint64_t get_call_max_args_fp_registers() const noexcept override;
+    virtual std::uint64_t get_call_shadow_space_size() const noexcept override;
 
-    /* RCX, RDX, R8, R9 */
-    virtual const std::vector<RegisterId>& get_call_args_gp_registers() const noexcept override;
-
-    /* Xmm0-Xmm5 */
-    virtual const std::vector<RegisterId>& get_call_args_fp_registers() const noexcept override;
-
-    /* RAX */
-    virtual RegisterId get_function_call_ptr() const noexcept override { return GpRegisters_x86_64_RAX; }
-
-    /* Windows function calls need 32 bytes of shadow space on the stack to spill arguments */
-    virtual uint64_t get_fcall_shadow_space() const noexcept override { return 32; }
-
-    /* Windows abi needs 8 bytes to store rbp */
-    virtual uint64_t get_stack_base_offset() const noexcept override { return 8; }
+    virtual std::uint64_t get_stack_base_offset() const noexcept override;
 };
 
-/* Or SysV ABI */
-class LinuxX64ABI : public PlatformABI
+/* SysV AMD64 */
+class MATHEXPR_API LinuxX64ABI : public PlatformABI
 {
 public:
     virtual ~LinuxX64ABI() = default;
 
-    virtual std::string_view get_as_string() const noexcept override { return "Linux x64"; }
+    virtual std::string_view get_as_string() const noexcept override;
 
-    virtual uint32_t get_id() const noexcept override { return PlatformABIID_LinuxX64; };
+    virtual std::uint32_t get_id() const noexcept override;
 
-    virtual uint32_t get_target_isa() const noexcept override { return ISA_x86_64; }
+    virtual ISA get_target_isa() const noexcept override;
 
-    virtual bool can_fold_memory_operand() const noexcept override { return true; }
+    virtual bool can_fold_memory_operand() const noexcept override;
 
-    virtual bool has_two_address_form() const noexcept override { return true; }
+    virtual bool has_two_address_form() const noexcept override;
 
-    /* RDI */
     virtual RegisterId get_variable_base_ptr() const noexcept override;
 
-    /* RSI */
     virtual RegisterId get_literal_base_ptr() const noexcept override;
 
-    /* 6 */
-    virtual uint64_t get_max_available_gp_registers() const noexcept override;
+    virtual RegisterId get_function_call_ptr() const noexcept override;
 
-    /* 8 */
-    virtual uint64_t get_max_available_fp_registers() const noexcept override;
+    virtual std::span<const RegisterId> get_gp_allocatable_registers() const noexcept override;
+    virtual std::span<const RegisterId> get_fp_allocatable_registers() const noexcept override;
 
-    virtual const std::vector<RegisterId>& get_caller_saved_fp_registers() const noexcept override;
+    virtual std::span<const RegisterId> get_caller_saved_gp_registers() const noexcept override;
+    virtual std::span<const RegisterId> get_caller_saved_fp_registers() const noexcept override;
 
-    /* RAX */
+    virtual std::span<const RegisterId> get_callee_saved_gp_registers() const noexcept override;
+    virtual std::span<const RegisterId> get_callee_saved_fp_registers() const noexcept override;
+
     virtual RegisterId get_call_return_value_gp_register() const noexcept override;
-
-    /* Xmm0 */
     virtual RegisterId get_call_return_value_fp_register() const noexcept override;
 
-    /* 6 */
-    virtual uint64_t get_call_max_args_gp_registers() const noexcept override;
+    virtual std::span<const RegisterId> get_call_args_gp_registers() const noexcept override;
+    virtual std::span<const RegisterId> get_call_args_fp_registers() const noexcept override;
 
-    /* 8 */
-    virtual uint64_t get_call_max_args_fp_registers() const noexcept override;
+    virtual std::uint64_t get_stack_red_zone_size() const noexcept override;
 
-    /* RSI, RDI, RCX, RDX, R8, R9 */
-    virtual const std::vector<RegisterId>& get_call_args_gp_registers() const noexcept override;
-
-    /* Xmm0-Xmm7 */
-    virtual const std::vector<RegisterId>& get_call_args_fp_registers() const noexcept override;
-
-    /* RAX */
-    virtual RegisterId get_function_call_ptr() const noexcept override { return GpRegisters_x86_64_RAX; }
-
-    /* Same as Windows, SysV abi needs 8 bytes to store rbp */
-    virtual uint64_t get_stack_base_offset() const noexcept override { return 8; }
+    virtual std::uint64_t get_stack_base_offset() const noexcept override;
 };
 
-// https://github.com/ARM-software/abi-aa/blob/main/aapcs64/aapcs64.rst#machine-registers
-
-class AppleARM64ABI : public PlatformABI
+class MATHEXPR_API AppleARM64ABI : public PlatformABI
 {
 public:
     virtual ~AppleARM64ABI() = default;
 
-    virtual std::string_view get_as_string() const noexcept override { return "Apple ARM64"; }
+    virtual std::string_view get_as_string() const noexcept override;
 
-    virtual uint32_t get_id() const noexcept override { return PlatformABIID_AppleARM64; };
+    virtual std::uint32_t get_id() const noexcept override;
 
-    virtual uint32_t get_target_isa() const noexcept override { return ISA_aarch64; }
+    virtual ISA get_target_isa() const noexcept override;
 
-    /* X0 */
     virtual RegisterId get_variable_base_ptr() const noexcept override;
 
-    /* X1 */
     virtual RegisterId get_literal_base_ptr() const noexcept override;
 
-    /* 29 */
-    virtual uint64_t get_max_available_gp_registers() const noexcept override;
+    virtual RegisterId get_function_call_ptr() const noexcept override;
 
-    /* 31 */
-    virtual uint64_t get_max_available_fp_registers() const noexcept override;
+    virtual std::span<const RegisterId> get_gp_allocatable_registers() const noexcept override;
+    virtual std::span<const RegisterId> get_fp_allocatable_registers() const noexcept override;
 
-    virtual const std::vector<RegisterId>& get_caller_saved_fp_registers() const noexcept override;
+    virtual std::span<const RegisterId> get_caller_saved_gp_registers() const noexcept override;
+    virtual std::span<const RegisterId> get_caller_saved_fp_registers() const noexcept override;
 
-    /* X0 */
+    virtual std::span<const RegisterId> get_callee_saved_gp_registers() const noexcept override;
+    virtual std::span<const RegisterId> get_callee_saved_fp_registers() const noexcept override;
+
     virtual RegisterId get_call_return_value_gp_register() const noexcept override;
-
-    /* V0 */
     virtual RegisterId get_call_return_value_fp_register() const noexcept override;
 
-    /* 8 */
-    virtual uint64_t get_call_max_args_gp_registers() const noexcept override;
+    virtual std::span<const RegisterId> get_call_args_gp_registers() const noexcept override;
+    virtual std::span<const RegisterId> get_call_args_fp_registers() const noexcept override;
 
-    /* 8 */
-    virtual uint64_t get_call_max_args_fp_registers() const noexcept override;
+    virtual std::uint64_t get_stack_red_zone_size() const noexcept override;
 
-    /* R0-R7 */
-    virtual const std::vector<RegisterId>& get_call_args_gp_registers() const noexcept override;
+    virtual std::uint64_t get_stack_base_offset() const noexcept override;
+};
 
-    /* V0-V7 */
-    virtual const std::vector<RegisterId>& get_call_args_fp_registers() const noexcept override;
+class MATHEXPR_API NvPTXABI : public PlatformABI
+{
+public:
+    virtual ~NvPTXABI() = default;
 
-    /* RAX */
-    virtual RegisterId get_function_call_ptr() const noexcept override { return GpRegisters_x86_64_RAX; }
+    virtual std::string_view get_as_string() const noexcept override;
 
-    /* 128 bytes for the stack red zone */
-    virtual uint64_t get_fcall_shadow_space() const noexcept override { return 128; }
+    virtual std::uint32_t get_id() const noexcept override;
 
-    virtual uint64_t get_stack_base_offset() const noexcept override { return 8; }
+    virtual ISA get_target_isa() const noexcept override;
+
+    virtual bool has_virtual_registers() const noexcept override;
+
+    virtual RegisterId get_variable_base_ptr() const noexcept override;
+
+    virtual RegisterId get_literal_base_ptr() const noexcept override;
+
+    virtual RegisterId get_function_call_ptr() const noexcept override;
+
+    virtual std::span<const RegisterId> get_gp_allocatable_registers() const noexcept override;
+    virtual std::span<const RegisterId> get_fp_allocatable_registers() const noexcept override;
+
+    virtual std::span<const RegisterId> get_caller_saved_gp_registers() const noexcept override;
+    virtual std::span<const RegisterId> get_caller_saved_fp_registers() const noexcept override;
+
+    virtual std::span<const RegisterId> get_callee_saved_gp_registers() const noexcept override;
+    virtual std::span<const RegisterId> get_callee_saved_fp_registers() const noexcept override;
+
+    virtual RegisterId get_call_return_value_gp_register() const noexcept override;
+    virtual RegisterId get_call_return_value_fp_register() const noexcept override;
+
+    virtual std::span<const RegisterId> get_call_args_gp_registers() const noexcept override;
+    virtual std::span<const RegisterId> get_call_args_fp_registers() const noexcept override;
 };
 
 MATHEXPR_NAMESPACE_END

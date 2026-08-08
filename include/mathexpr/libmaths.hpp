@@ -7,7 +7,7 @@
 #if !defined(__MATHEXPR_LIBMATHS)
 #define __MATHEXPR_LIBMATHS
 
-#include "mathexpr/simdtypes.hpp"
+#include "mathexpr/types.hpp"
 
 #include <unordered_map>
 #include <string>
@@ -18,6 +18,47 @@
 MATHEXPR_NAMESPACE_BEGIN
 
 LIBMATHS_NAMESPACE_BEGIN
+
+enum class FunctionId : std::uint32_t 
+{
+    Abs = 0,
+    Sqrt,
+    Cbrt,
+    Pow,
+    Exp,
+    Expm1,
+    Log,
+    Log10,
+    Log2,
+    Log1p,
+    Sin,
+    Cos,
+    Tan,
+    Asin,
+    Acos,
+    Atan,
+    Atan2,
+    Sinh,
+    Cosh,
+    Tanh,
+    Asinh,
+    Acosh,
+    Atanh,
+    Floor,
+    Ceil,
+    Trunc,
+    Round,
+    Fmod,
+    Remainder,
+    Copysign,
+    Hypot,
+    Radians,
+    Degrees,
+
+    COUNT,
+
+    Unknown,
+};
 
 /* Core mathematical functions */
 /* Absolute value */
@@ -272,15 +313,21 @@ using Fn3_d4 = double4 (*)(double4, double4, double4) noexcept;
 #endif // defined(MATHEXPR_X86_64)
 
 struct FunctionEntry {
+    std::string_view name;
     void* scalar_ptr;
     void* vector2_ptr;
 #if defined(MATHEXPR_X86_64)
     void* vector4_ptr;
 #endif // defined(MATHEXPR_X86_64)
-    size_t arity;
+    std::size_t arity;
 };
 
-MATHEXPR_API const FunctionEntry* get_function_entry(const std::string_view& name) noexcept;
+// Returns FunctionId::Unknown for invalid name
+MATHEXPR_API FunctionId get_function_id(std::string_view name) noexcept;
+
+// Returns nullptr for invalid name/id
+MATHEXPR_API const FunctionEntry* get_function_entry(std::string_view name) noexcept;
+MATHEXPR_API const FunctionEntry* get_function_entry(FunctionId id) noexcept;
 
 LIBMATHS_NAMESPACE_END
 

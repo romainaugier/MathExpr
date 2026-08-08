@@ -6,61 +6,63 @@
 
 MATHEXPR_NAMESPACE_BEGIN
 
-uint32_t get_current_platform() noexcept
+Platform get_current_platform() noexcept
 {
 #if defined(MATHEXPR_WIN)
-    return Platform_Windows;
+    return Platform::Windows;
 #elif defined(MATHEXPR_LINUX)
-    return Platform_Linux;
+    return Platform::Linux;
 #elif defined(MATHEXPR_APPLE)
-    return Platform_Apple;
+    return Platform::Apple;
 #endif /* defined(MATHEXPR_WIN) */
-    return Platform_Invalid;
+    return Platform::Invalid;
 }
 
-const char* platform_as_string(uint32_t platform) noexcept
+const char* platform_as_string(Platform platform) noexcept
 {
     switch(platform)
     {
-        case Platform_Linux:
+        case Platform::Linux:
             return "Linux";
-        case Platform_Windows:
+        case Platform::Windows:
             return "Windows";
-        case Platform_Apple:
+        case Platform::Apple:
             return "MacOS";
         default:
             return "Unknown platform";
     }
 }
 
-uint32_t get_current_isa() noexcept
+ISA get_current_isa() noexcept
 {
 #if defined(MATHEXPR_X86_64)
-    return ISA_x86_64;
+    return ISA::x86_64;
 #elif defined(MATHEXPR_AARCH64)
-    return ISA_aarch64;
+    return ISA::aarch64;
 #endif /* defined(MATHEXPR_X86_64) */
-    return ISA_Invalid;
+    return ISA::Invalid;
 }
 
-const char* isa_as_string(uint32_t isa) noexcept
+const char* isa_as_string(ISA isa) noexcept
 {
     switch(isa)
     {
-        case ISA_x86_64:
+        case ISA::x86_64:
             return "x86_64";
-        case ISA_aarch64:
+        case ISA::aarch64:
             return "aarch64";
+        case ISA::nvptx:
+            return "nvptx";
         default:
             return "Unknown ISA";
     }
 }
 
-const char* gp_register_as_string(uint32_t reg, uint32_t isa) noexcept
+const char* gp_register_as_string(RegisterId reg, ISA isa) noexcept
 {
     switch(isa)
     {
-        case ISA_x86_64:
+        case ISA::x86_64:
         {
             switch(reg)
             {
@@ -86,7 +88,7 @@ const char* gp_register_as_string(uint32_t reg, uint32_t isa) noexcept
             break;
         }
 
-        case ISA_aarch64:
+        case ISA::aarch64:
         {
             switch(reg)
             {
@@ -132,11 +134,11 @@ const char* gp_register_as_string(uint32_t reg, uint32_t isa) noexcept
     }
 }
 
-const char* fp_register_as_string(uint32_t reg, uint32_t isa) noexcept
+const char* fp_register_as_string(RegisterId reg, ISA isa) noexcept
 {
     switch(isa)
     {
-        case ISA_x86_64:
+        case ISA::x86_64:
         {
             switch(reg)
             {
@@ -160,7 +162,7 @@ const char* fp_register_as_string(uint32_t reg, uint32_t isa) noexcept
             }
         }
 
-        case ISA_aarch64:
+        case ISA::aarch64:
         {
             switch(reg)
             {

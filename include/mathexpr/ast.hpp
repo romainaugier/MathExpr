@@ -8,6 +8,8 @@
 #define __MATHEXPR_AST
 
 #include "mathexpr/lexer.hpp"
+#include "mathexpr/op.hpp"
+#include "mathexpr/utils/slab.hpp"
 
 #include <memory>
 #include <iostream>
@@ -98,13 +100,13 @@ public:
 
 class MATHEXPR_API ASTNodeUnaryOp : public ASTNode
 {
-    std::shared_ptr<ASTNode> _operand;
+    ASTNode* _operand;
 
-    uint32_t _op;
+    UnaryOpType _op;
 
 public:
-    ASTNodeUnaryOp(std::shared_ptr<ASTNode> operand, 
-                   uint32_t op) : ASTNode(true),
+    ASTNodeUnaryOp(ASTNode* operand, 
+                   UnaryOpType op) : ASTNode(true),
                                   _operand(std::move(operand)),
                                   _op(op) {}
 
@@ -114,29 +116,29 @@ public:
 
     virtual std::optional<std::vector<ASTNode*>> get_children() const noexcept override 
     {
-        return std::vector<ASTNode*>({ this->_operand.get() }); 
+        return std::vector<ASTNode*>({ this->_operand }); 
     }
 
     static constexpr int static_type_id() { return ASTNodeTypeId_UnOp; }
 
     virtual int type_id() const noexcept override { return this->static_type_id(); }
 
-    const ASTNode* get_operand() const noexcept { return this->_operand.get(); }
+    const ASTNode* get_operand() const noexcept { return this->_operand; }
 
-    uint32_t get_op() const noexcept { return this->_op; }
+    UnaryOpType get_op() const noexcept { return this->_op; }
 };
 
 class MATHEXPR_API ASTNodeBinaryOp : public ASTNode
 {
-    std::shared_ptr<ASTNode> _left;
-    std::shared_ptr<ASTNode> _right;
+    ASTNode* _left;
+    ASTNode* _right;
 
-    uint32_t _op;
+    BinaryOpType _op;
 
 public:
-    ASTNodeBinaryOp(std::shared_ptr<ASTNode> left, 
-                    std::shared_ptr<ASTNode> right, 
-                    uint32_t op) : ASTNode(true),
+    ASTNodeBinaryOp(ASTNode* left, 
+                    ASTNode* right, 
+                    BinaryOpType op) : ASTNode(true),
                                    _left(std::move(left)),
                                    _right(std::move(right)),
                                    _op(op) {} 
@@ -147,29 +149,29 @@ public:
 
     virtual std::optional<std::vector<ASTNode*>> get_children() const noexcept override 
     {
-        return std::vector<ASTNode*>({ this->_left.get(), this->_right.get() }); 
+        return std::vector<ASTNode*>({ this->_left, this->_right }); 
     }
 
     static constexpr int static_type_id() { return ASTNodeTypeId_BinOp; }
 
     virtual int type_id() const noexcept override { return this->static_type_id(); }
 
-    const ASTNode* get_left() const noexcept { return this->_left.get(); }
+    const ASTNode* get_left() const noexcept { return this->_left; }
 
-    const ASTNode* get_right() const noexcept { return this->_right.get(); }
+    const ASTNode* get_right() const noexcept { return this->_right; }
 
-    uint32_t get_op() const noexcept { return this->_op; }
+    BinaryOpType get_op() const noexcept { return this->_op; }
 };
 
 class MATHEXPR_API ASTNodeFunctionOp : public ASTNode
 {
-    std::vector<std::shared_ptr<ASTNode>> _arguments;
+    std::vector<ASTNode*> _arguments;
 
     std::string_view _name;
 
 public:
     ASTNodeFunctionOp(std::string_view name, 
-                        std::vector<std::shared_ptr<ASTNode>> arguments) : ASTNode(true),
+                      std::vector<ASTNode*> arguments) : ASTNode(true),
                                                                            _arguments(std::move(arguments)), 
                                                                            _name(name) {}
 
@@ -183,7 +185,7 @@ public:
 
         for(const auto& argument : this->_arguments)
         {
-            children.push_back(argument.get());
+            children.push_back(argument);
         }
 
         return children;
@@ -195,7 +197,7 @@ public:
 
     std::string_view get_function_name() const noexcept { return this->_name; }
 
-    const std::vector<std::shared_ptr<ASTNode>>& get_arguments() const noexcept { return this->_arguments; }
+    const std::vector<ASTNode*>& get_arguments() const noexcept { return this->_arguments; }
 
     size_t get_arguments_count() const noexcept { return this->_arguments.size(); }
 };
@@ -217,26 +219,20 @@ public:
     static constexpr size_t PRINT_INDENT_SIZE = 4;
 
 private:
-    std::shared_ptr<ASTNode> _root;
+    ASTNode* _root;
+
+    SlabAllocator& _slab;
 
 public:
-    AST() {}
+    AST(SlabAllocator& slab) : _slab(slab) {}
 
-    ASTNode* get_root() noexcept { return this->_root.get(); }
+    ASTNode* get_root() noexcept { return this->_root; }
 
-    const ASTNode* get_root() const noexcept { return this->_root.get(); }
+    const ASTNode* get_root() const noexcept { return this->_root; }
 
     void print() const noexcept;
 
     bool build_from_tokens(const LexerTokens& tokens) noexcept;
-
-    void clear() noexcept 
-    {
-        if(this->_root)
-        {
-            this->_root.reset();
-        }
-    }
 };
 
 MATHEXPR_NAMESPACE_END

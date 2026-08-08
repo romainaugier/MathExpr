@@ -19,19 +19,26 @@
 
 MATHEXPR_NAMESPACE_BEGIN
 
-enum ExprPrintFlags : uint64_t
+enum class ExprPrintFlags : std::uint64_t
 {
-    ExprPrintFlags_PrintAST = 0x1,
-    ExprPrintFlags_PrintSymTable = 0x2,
-    ExprPrintFlags_PrintSSA = 0x4,
-    ExprPrintFlags_PrintSSAOptimized = 0x8,
-    ExprPrintFlags_PrintSSAOptimizationSteps = 0x10,
-    ExprPrintFlags_PrintSSARegisterAlloc = 0x20,
-    ExprPrintFlags_PrintCodeGeneratorAsString = 0x40,
-    ExprPrintFlags_PrintCodeGeneratorByteCodeAsHexCode = 0x80,
-    ExprPrintFlags_PrintCodeGeneratorRelocations = 0x100,
-    ExprPrintFlags_PrintAll = UINT64_T_MAX,
+    None = 0x0,
+    PrintAST = 0x1,
+    PrintSymTable = 0x2,
+    PrintSSA = 0x4,
+    PrintSSAOptimized = 0x8,
+    PrintSSAOptimizationSteps = 0x10,
+    PrintMIR = 0x20,
+    PrintRegisterAlloc = 0x40,
+    PrintCodeGeneratorAsString = 0x80,
+    PrintCodeGeneratorByteCodeAsHexCode = 0x100,
+    PrintCodeGeneratorRelocations = 0x200,
+    PrintAll = UINT64_T_MAX,
 };
+
+MATHEXPR_FORCE_INLINE bool operator&(const ExprPrintFlags left, const ExprPrintFlags right) noexcept
+{
+    return (static_cast<std::uint64_t>(left) & static_cast<std::uint64_t>(right)) > 0;
+}
 
 using Variables = std::unordered_map<std::string, double, string_hash, std::equal_to<>>;
 
@@ -49,7 +56,7 @@ class MATHEXPR_API Expr
 public:
     Expr(std::string expr) : _expr(std::move(expr)) {}
 
-    bool compile(uint64_t debug_flags = 0) noexcept;
+    bool compile(ExprPrintFlags debug_flags = ExprPrintFlags::None) noexcept;
 
     template<typename... Args>
         requires (std::same_as<std::remove_cvref_t<Args>, double> && ...)
@@ -76,9 +83,7 @@ public:
     std::tuple<bool, double> evaluate(const Variables& variables) const noexcept
     {
         if(variables.size() != this->_variables.size())
-        {
             return std::make_tuple(false, 0.0);
-        }
 
         std::vector<double> values;
         values.reserve(this->_variables.size());
@@ -88,9 +93,7 @@ public:
             const auto it = variables.find(variable);
 
             if(it == variables.end())
-            {
                 return std::make_tuple(false, 0.0);
-            }
 
             values.push_back(it->second);
         }

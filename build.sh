@@ -25,6 +25,14 @@ parse_args()
 
     [ "$1" == "--install" ] && INSTALL=1
 
+    [ "$1" == "--threadsan" ] && THREADSAN=1
+
+    [ "$1" == "--ubsan" ] && UBSAN=1
+
+    [ "$1" == "--addrsan" ] && ADDRSAN=1
+
+    [ "$1" == "--leaksan" ] && LEAKSAN=1
+
     [ "$1" == "--export-compile-commands" ] && EXPORTCOMPILECOMMANDS=1
 
     [ "$1" == *"version"* ] && parse_version $1
@@ -74,6 +82,23 @@ do
     parse_args "$arg"
 done
 
+if [[ $UBSAN -eq 1 ]]; then
+    if [[ $ADDRSAN -eq 1 ]]; then
+        log_error "Undefined Behavior Sanitizer and Address Sanitizer are not compatible"
+        exit 1
+    fi
+
+    if [[ $LEAKSAN -eq 1 ]]; then
+        log_error "Undefined Behavior Sanitizer and Leak Sanitizer are not compatible"
+        exit 1
+    fi
+
+    if [[ $THREADSAN -eq 1 ]]; then
+        log_error "Undefined Behavior Sanitizer and Thread Sanitizer are not compatible"
+        exit 1
+    fi
+fi
+
 log_info "Build type: $BUILDTYPE"
 log_info "Build version: $VERSION"
 
@@ -87,7 +112,14 @@ if [[ -d "install" && $REMOVEOLDDIR -eq 1 ]]; then
     rm -rf install
 fi
 
-cmake -S . -B build -DRUN_TESTS=$RUNTESTS -DCMAKE_EXPORT_COMPILE_COMMANDS=$EXPORTCOMPILECOMMANDS -DCMAKE_BUILD_TYPE=$BUILDTYPE -DVERSION=$VERSION
+cmake -S . -B build -DRUN_TESTS=$RUNTESTS \
+                    -DCMAKE_EXPORT_COMPILE_COMMANDS=$EXPORTCOMPILECOMMANDS \
+                    -DCMAKE_BUILD_TYPE=$BUILDTYPE \
+                    -DVERSION=$VERSION \
+                    -DTHREADSAN=$THREADSAN \
+                    -DUBSAN=$UBSAN \
+                    -DADDRSAN=$ADDRSAN \
+                    -DLEAKSAN=LEAK$SAN
 
 if [[ $? -ne 0 ]]; then
     log_error "Error during CMake configuration"
