@@ -14,6 +14,7 @@
 
 #include <string>
 #include <span>
+#include <memory_resource>
 
 MATHEXPR_NAMESPACE_BEGIN
 
@@ -173,6 +174,8 @@ struct MIRInstr
     std::uint32_t num_operands;
     std::array<MIROperand, MAX_OPERANDS> operands;
 
+    explicit MIRInstr(MIROp op) noexcept : op(op), num_operands(0) {}
+
     explicit MIRInstr(MIROp op, std::initializer_list<MIROperand> operands) noexcept
     {
         this->op = op;
@@ -182,19 +185,45 @@ struct MIRInstr
             this->operands[i] = operand;
     }
 
+    template<typename Iterator>
+    requires std::input_iterator<Iterator> &&
+             std::same_as<std::iter_value_t<Iterator>, MIROperand>
+    MIRInstr(MIROp op, Iterator begin, Iterator end) noexcept
+    {
+        this->op = op;
+        this->num_operands = std::distance(begin, end);
+
+        std::size_t i = 0;
+
+        for(auto it = begin; it != end; ++it)
+            this->operands[i++] = *it;
+    }
+
     void print(std::ostream_iterator<char>& out) const noexcept;
 };
 
 struct MATHEXPR_API MIRFunc
 {
+private:
+    static constexpr std::size_t INSTR_BUFFER_SIZE = 128;
+
+    std::array<std::byte, INSTR_BUFFER_SIZE * sizeof(MIRInstr)> buffer;
+    std::pmr::monotonic_buffer_resource instructions_pool{buffer.data(), buffer.size()};
+
+public:
     std::uint32_t num_fp_vregs = 0;
 
-    /* frame, computed by the register allocator */
+    /* Stack frame size, computed by the register allocator */
     std::uint32_t stack_size = 0;
     std::uint32_t num_spill_slots = 0;
 
-    std::vector<MIRInstr> instructions;
+    std::pmr::vector<MIRInstr> instructions{std::addressof(instructions_pool)};
     std::vector<std::uint32_t> call_clobbered;
+
+    MIRFunc() = default;
+
+    MATHEXPR_NON_COPYABLE(MIRFunc);
+    MATHEXPR_NON_MOVABLE(MIRFunc);
 
     std::uint32_t create_fp_vreg() noexcept { return this->num_fp_vregs++; }
 

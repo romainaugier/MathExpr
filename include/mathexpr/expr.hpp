@@ -29,9 +29,11 @@ enum class ExprPrintFlags : std::uint64_t
     PrintSSAOptimizationSteps = 0x10,
     PrintMIR = 0x20,
     PrintRegisterAlloc = 0x40,
-    PrintCodeGeneratorAsString = 0x80,
-    PrintCodeGeneratorByteCodeAsHexCode = 0x100,
-    PrintCodeGeneratorRelocations = 0x200,
+    PrintMIRFinalized = 0x80,
+    PrintCodeGeneratorAsString = 0x100,
+    PrintCodeGeneratorByteCodeAsHexCode = 0x200,
+    PrintCodeGeneratorRelocations = 0x400,
+    PrintElapsedTime = 0x800,
     PrintAll = UINT64_T_MAX,
 };
 

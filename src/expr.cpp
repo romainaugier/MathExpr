@@ -5,8 +5,7 @@
 #include "mathexpr/expr.hpp"
 #include "mathexpr/log.hpp"
 #include "mathexpr/isel.hpp"
-#include "mathexpr/codegen.hpp"
-#include "mathexpr/regalloc.hpp"
+#include "mathexpr/finalize.hpp"
 
 #include <iterator>
 #include <algorithm>
@@ -32,6 +31,8 @@ std::tuple<bool, double> Expr::_evaluate_internal(const double* values) const no
 
 bool Expr::compile(ExprPrintFlags debug_flags) noexcept
 {
+    auto start_time = std::chrono::steady_clock::now();
+
     Platform platform = get_current_platform();
 
     if(platform == Platform::Invalid)
@@ -121,14 +122,45 @@ bool Expr::compile(ExprPrintFlags debug_flags) noexcept
 
     MIRFunc mir_func;
 
-    if(!isel->lower_ssa_to_mir(ssa, symtable, ScalarType::F64, mir_func))
+    if(!isel->lower_ssa_to_mir(ssa, symtable, platform_abi, ScalarType::F64, mir_func))
     {
         log_error("Error while selecting instructions for expression: {}", this->_expr);
         log_error("Check the log for more information");
         return false;
     }
 
-    mir_func.print();
+    if(debug_flags & ExprPrintFlags::PrintMIR)
+        mir_func.print();
+
+    RAFuncInfo ra_info;
+
+    if(!RegAllocator::allocate(mir_func, platform_abi, ra_info))
+    {
+        log_error("Error while allocating registers for expression: {}", this->_expr);
+        log_error("Check the log for more information");
+        return false;
+    }
+
+    MIRFunc mir_func_final;
+
+    if(!finalize_mir(mir_func, ra_info, platform_abi, ScalarType::F64, mir_func_final))
+    {
+        log_error("Error while finalizing MIR for expression: {}", this->_expr);
+        log_error("Check the log for more information");
+        return false;
+    }
+
+    if(debug_flags & ExprPrintFlags::PrintMIRFinalized)
+        mir_func_final.print();
+
+    auto end_time = std::chrono::steady_clock::now();
+
+    if(debug_flags & ExprPrintFlags::PrintElapsedTime)
+    {
+        auto elapsed = std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(end_time - start_time).count();
+
+        log_info("Time taken to compile expression: {} {} ms", this->_expr, elapsed);
+    }
 
     return false;
 }

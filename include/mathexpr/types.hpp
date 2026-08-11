@@ -19,9 +19,11 @@ MATHEXPR_NAMESPACE_BEGIN
 
 enum class ScalarType : std::uint8_t
 {
-    F32,
+    F32 = 0,
     F64,
 };
+
+MATHEXPR_API std::size_t scalar_type_size(const ScalarType type) noexcept;
 
 #if defined(MATHEXPR_X86_64)
 using float4 = __m128;

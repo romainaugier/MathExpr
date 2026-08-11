@@ -11,6 +11,7 @@ MATHEXPR_NAMESPACE_BEGIN
 
 bool ISel::lower_ssa_to_mir(const SSA& ssa,
                             SymbolTable& symtab,
+                            const PlatformABI* abi,
                             ScalarType st,
                             MIRFunc& out) const noexcept
 {
@@ -122,33 +123,20 @@ bool ISel::lower_ssa_to_mir(const SSA& ssa,
             {
                 const auto* funcop = static_cast<const SSAStmtFunctionOp*>(stmt);
 
-                const libmaths::FunctionId func_id =
-                    libmaths::get_function_id(funcop->get_name());
+                std::vector<std::uint32_t> arg_vregs;
+                arg_vregs.reserve(funcop->get_arguments().size());
+
+                for(const SSAStmt* arg : funcop->get_arguments())
+                    arg_vregs.emplace_back(vreg_of(arg));
+
+                if(!ISel::emit_call(out, funcop, arg_vregs, abi))
+                    return false;
+
+                const libmaths::FunctionId func_id = libmaths::get_function_id(funcop->get_name());
 
                 if(func_id == libmaths::FunctionId::Unknown)
                     return false;
 
-                /*
-                    Call layout:
-                        operands[0] = Func
-                        operands[1] = vreg_def result
-                        operands[2..] = argument vreg uses
-                */
-
-                MIRInstr call(MIROp::Call,
-                    { MIROperand::function(func_id),
-                      MIROperand::vreg_def(vreg_of(stmt)) });
-
-                for(const SSAStmt* arg : funcop->get_arguments())
-                {
-                    if(call.num_operands >= MIRInstr::MAX_OPERANDS)
-                        return false;
-
-                    call.operands[call.num_operands++] =
-                        MIROperand::vreg_use(vreg_of(arg));
-                }
-
-                out.instructions.push_back(call);
                 break;
             }
 
@@ -157,7 +145,18 @@ bool ISel::lower_ssa_to_mir(const SSA& ssa,
         }
     }
 
-    out.instructions.emplace_back(MIROp::Ret, std::initializer_list<MIROperand>{});
+    const MIRInstr& last_instr = out.instructions.back();
+
+    if(last_instr.num_operands > 0)
+    {
+        out.instructions.emplace_back(MIROp::Move,
+            std::initializer_list<MIROperand>{
+                MIROperand::phys(abi->get_call_return_value_fp_register(), MIROperand::Flags::Def),
+                MIROperand::vreg_use(last_instr.operands.front().vreg.id),
+        });
+    }
+
+    out.instructions.emplace_back(MIROp::Ret);
 
     return true;
 }
