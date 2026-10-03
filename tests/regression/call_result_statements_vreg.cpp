@@ -7,10 +7,12 @@
 
 #include "../utils.hpp"
 
+// "sin(a) + b" reads an undefined v4
+
 int main(void)
 {
     mathexpr::set_log_level(mathexpr::LogLevel::Debug);
-    mathexpr::log_info("Starting call_sin test");
+    mathexpr::log_info("Starting call_result_statements_vreg test");
 
     const char* expression = "sin(a) + b";
 
@@ -40,7 +42,7 @@ int main(void)
     if(!DOUBLE_EQ(res, 1.0))
         return 1;
 
-    mathexpr::log_info("Finished call_sin test");
+    mathexpr::log_info("Finished call_result_statements_vreg test");
 
     return 0;
 }
