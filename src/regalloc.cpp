@@ -104,6 +104,12 @@ bool RegAllocator::allocate(const MIRFunc& func,
         iv.spans_call = (it != call_points.end() && *it <= iv.end);
     }
 
+    std::sort(intervals.begin(),
+              intervals.end(),
+              [](const LiveInterval& lhs, const LiveInterval& rhs) {
+                  return lhs.start < rhs.start;
+              });
+
     // Linear scan
     const std::span<const std::uint32_t> volatile_regs = abi->get_caller_saved_fp_registers();
     const std::span<const std::uint32_t> callee_saved_regs = abi->get_callee_saved_fp_registers();
