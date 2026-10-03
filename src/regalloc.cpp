@@ -111,7 +111,7 @@ bool RegAllocator::allocate(const MIRFunc& func,
               });
 
     // Linear scan
-    const std::span<const std::uint32_t> volatile_regs = abi->get_caller_saved_fp_registers();
+    const std::span<const std::uint32_t> volatile_regs = abi->get_allocatable_caller_saved_fp_registers();
     const std::span<const std::uint32_t> callee_saved_regs = abi->get_callee_saved_fp_registers();
 
     std::bitset<MAX_FP_REGS> reg_free;

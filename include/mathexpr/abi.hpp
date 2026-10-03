@@ -60,13 +60,10 @@ public:
     /* scratch register used to hold the target address of an indirect call */
     virtual RegisterId get_function_call_ptr() const noexcept = 0;
 
-    /*
-        Register allocation priority lists. Caller-saved registers come first,
-        callee-saved registers are appended at the end so the register allocator
-        only uses them when spilling would otherwise be required.
-    */
     virtual std::span<const RegisterId> get_gp_allocatable_registers() const noexcept = 0;
-    virtual std::span<const RegisterId> get_fp_allocatable_registers() const noexcept = 0;
+
+    virtual std::span<const RegisterId> get_scratch_fp_registers() const noexcept = 0;
+    virtual std::span<const RegisterId> get_allocatable_caller_saved_fp_registers() const noexcept = 0;
 
     /* Registers clobbered by a call (subset of the allocatable lists) */
     virtual std::span<const RegisterId> get_caller_saved_gp_registers() const noexcept = 0;
@@ -119,7 +116,9 @@ public:
     virtual RegisterId get_function_call_ptr() const noexcept override;
 
     virtual std::span<const RegisterId> get_gp_allocatable_registers() const noexcept override;
-    virtual std::span<const RegisterId> get_fp_allocatable_registers() const noexcept override;
+
+    virtual std::span<const RegisterId> get_scratch_fp_registers() const noexcept override;
+    virtual std::span<const RegisterId> get_allocatable_caller_saved_fp_registers() const noexcept override;
 
     virtual std::span<const RegisterId> get_caller_saved_gp_registers() const noexcept override;
     virtual std::span<const RegisterId> get_caller_saved_fp_registers() const noexcept override;
@@ -161,7 +160,9 @@ public:
     virtual RegisterId get_function_call_ptr() const noexcept override;
 
     virtual std::span<const RegisterId> get_gp_allocatable_registers() const noexcept override;
-    virtual std::span<const RegisterId> get_fp_allocatable_registers() const noexcept override;
+
+    virtual std::span<const RegisterId> get_scratch_fp_registers() const noexcept override;
+    virtual std::span<const RegisterId> get_allocatable_caller_saved_fp_registers() const noexcept override;
 
     virtual std::span<const RegisterId> get_caller_saved_gp_registers() const noexcept override;
     virtual std::span<const RegisterId> get_caller_saved_fp_registers() const noexcept override;
@@ -198,7 +199,9 @@ public:
     virtual RegisterId get_function_call_ptr() const noexcept override;
 
     virtual std::span<const RegisterId> get_gp_allocatable_registers() const noexcept override;
-    virtual std::span<const RegisterId> get_fp_allocatable_registers() const noexcept override;
+
+    virtual std::span<const RegisterId> get_scratch_fp_registers() const noexcept override;
+    virtual std::span<const RegisterId> get_allocatable_caller_saved_fp_registers() const noexcept override;
 
     virtual std::span<const RegisterId> get_caller_saved_gp_registers() const noexcept override;
     virtual std::span<const RegisterId> get_caller_saved_fp_registers() const noexcept override;
@@ -237,7 +240,9 @@ public:
     virtual RegisterId get_function_call_ptr() const noexcept override;
 
     virtual std::span<const RegisterId> get_gp_allocatable_registers() const noexcept override;
-    virtual std::span<const RegisterId> get_fp_allocatable_registers() const noexcept override;
+
+    virtual std::span<const RegisterId> get_scratch_fp_registers() const noexcept override;
+    virtual std::span<const RegisterId> get_allocatable_caller_saved_fp_registers() const noexcept override;
 
     virtual std::span<const RegisterId> get_caller_saved_gp_registers() const noexcept override;
     virtual std::span<const RegisterId> get_caller_saved_fp_registers() const noexcept override;

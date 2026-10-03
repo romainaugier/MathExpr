@@ -62,21 +62,13 @@ static constexpr std::array<RegisterId, 11> winx64_gp_allocatable = {
     GpRegisters_x86_64_R15,
 };
 
-/*
-    FP priority: XMM4/XMM5 first (volatile, never used for args/retval),
-    then XMM0-XMM3 (volatile but clobbered by calls / used for retval),
-    then callee-saved XMM6-XMM15.
-*/
-static constexpr std::array<RegisterId, 16> winx64_fp_allocatable = {
-    FpRegisters_x86_64_Xmm4,  FpRegisters_x86_64_Xmm5,
-    FpRegisters_x86_64_Xmm0,  FpRegisters_x86_64_Xmm1,
-    FpRegisters_x86_64_Xmm2,  FpRegisters_x86_64_Xmm3,
-    /* callee-saved below */
-    FpRegisters_x86_64_Xmm6,  FpRegisters_x86_64_Xmm7,
-    FpRegisters_x86_64_Xmm8,  FpRegisters_x86_64_Xmm9,
-    FpRegisters_x86_64_Xmm10, FpRegisters_x86_64_Xmm11,
-    FpRegisters_x86_64_Xmm12, FpRegisters_x86_64_Xmm13,
-    FpRegisters_x86_64_Xmm14, FpRegisters_x86_64_Xmm15,
+static constexpr std::array<RegisterId, 2> winx64_fp_scratch = {
+    FpRegisters_x86_64_Xmm4, FpRegisters_x86_64_Xmm5,
+};
+
+static constexpr std::array<RegisterId, 4> winx64_fp_allocatable_caller_saved = {
+    FpRegisters_x86_64_Xmm0, FpRegisters_x86_64_Xmm1,
+    FpRegisters_x86_64_Xmm2, FpRegisters_x86_64_Xmm3,
 };
 
 static constexpr std::array<RegisterId, 4> winx64_gp_caller_saved = {
@@ -130,15 +122,18 @@ static constexpr std::array<RegisterId, 11> linuxx64_gp_allocatable = {
     /* note: R14/R15 could be added here if we don't need them elsewhere */
 };
 
-static constexpr std::array<RegisterId, 16> linuxx64_fp_allocatable = {
+static constexpr std::array<RegisterId, 2> linuxx64_fp_scratch = {
+    FpRegisters_x86_64_Xmm14, FpRegisters_x86_64_Xmm15,
+};
+
+static constexpr std::array<RegisterId, 14> linuxx64_fp_allocatable_caller_saved = {
+    FpRegisters_x86_64_Xmm0,  FpRegisters_x86_64_Xmm1,
+    FpRegisters_x86_64_Xmm2,  FpRegisters_x86_64_Xmm3,
+    FpRegisters_x86_64_Xmm4,  FpRegisters_x86_64_Xmm5,
+    FpRegisters_x86_64_Xmm6,  FpRegisters_x86_64_Xmm7,
     FpRegisters_x86_64_Xmm8,  FpRegisters_x86_64_Xmm9,
     FpRegisters_x86_64_Xmm10, FpRegisters_x86_64_Xmm11,
     FpRegisters_x86_64_Xmm12, FpRegisters_x86_64_Xmm13,
-    FpRegisters_x86_64_Xmm14, FpRegisters_x86_64_Xmm15,
-    FpRegisters_x86_64_Xmm4,  FpRegisters_x86_64_Xmm5,
-    FpRegisters_x86_64_Xmm6,  FpRegisters_x86_64_Xmm7,
-    FpRegisters_x86_64_Xmm0,  FpRegisters_x86_64_Xmm1,
-    FpRegisters_x86_64_Xmm2,  FpRegisters_x86_64_Xmm3,
 };
 
 static constexpr std::array<RegisterId, 8> linuxx64_gp_caller_saved = {
@@ -202,8 +197,15 @@ static constexpr std::array<RegisterId, 25> arm64_gp_allocatable = {
     GpRegisters_aarch64_X27, GpRegisters_aarch64_X28,
 };
 
-static constexpr std::array<RegisterId, 32> arm64_fp_allocatable = {
-    /* volatile temporaries first */
+static constexpr std::array<RegisterId, 2> arm64_fp_scratch = {
+    FpRegisters_aarch64_V30, FpRegisters_aarch64_V31,
+};
+
+static constexpr std::array<RegisterId, 22> arm64_fp_allocatable_caller_saved = {
+    FpRegisters_aarch64_V0,  FpRegisters_aarch64_V1,
+    FpRegisters_aarch64_V2,  FpRegisters_aarch64_V3,
+    FpRegisters_aarch64_V4,  FpRegisters_aarch64_V5,
+    FpRegisters_aarch64_V6,  FpRegisters_aarch64_V7,
     FpRegisters_aarch64_V16, FpRegisters_aarch64_V17,
     FpRegisters_aarch64_V18, FpRegisters_aarch64_V19,
     FpRegisters_aarch64_V20, FpRegisters_aarch64_V21,
@@ -211,17 +213,6 @@ static constexpr std::array<RegisterId, 32> arm64_fp_allocatable = {
     FpRegisters_aarch64_V24, FpRegisters_aarch64_V25,
     FpRegisters_aarch64_V26, FpRegisters_aarch64_V27,
     FpRegisters_aarch64_V28, FpRegisters_aarch64_V29,
-    FpRegisters_aarch64_V30, FpRegisters_aarch64_V31,
-    /* argument/result registers (call-clobbered) */
-    FpRegisters_aarch64_V2,  FpRegisters_aarch64_V3,
-    FpRegisters_aarch64_V4,  FpRegisters_aarch64_V5,
-    FpRegisters_aarch64_V6,  FpRegisters_aarch64_V7,
-    FpRegisters_aarch64_V0,  FpRegisters_aarch64_V1,
-    /* callee-saved below (D8-D15, i.e. low 64 bits of V8-V15) */
-    FpRegisters_aarch64_V8,  FpRegisters_aarch64_V9,
-    FpRegisters_aarch64_V10, FpRegisters_aarch64_V11,
-    FpRegisters_aarch64_V12, FpRegisters_aarch64_V13,
-    FpRegisters_aarch64_V14, FpRegisters_aarch64_V15,
 };
 
 static constexpr std::array<RegisterId, 15> arm64_gp_caller_saved = {
@@ -326,9 +317,14 @@ std::span<const RegisterId> WindowsX64ABI::get_gp_allocatable_registers() const 
     return winx64_gp_allocatable;
 }
 
-std::span<const RegisterId> WindowsX64ABI::get_fp_allocatable_registers() const noexcept
+std::span<const RegisterId> WindowsX64ABI::get_scratch_fp_registers() const noexcept 
 {
-    return winx64_fp_allocatable;
+    return winx64_fp_scratch;
+}
+
+std::span<const RegisterId> WindowsX64ABI::get_allocatable_caller_saved_fp_registers() const noexcept 
+{
+    return winx64_fp_allocatable_caller_saved;
 }
 
 std::span<const RegisterId> WindowsX64ABI::get_caller_saved_gp_registers() const noexcept
@@ -428,9 +424,14 @@ std::span<const RegisterId> LinuxX64ABI::get_gp_allocatable_registers() const no
     return linuxx64_gp_allocatable;
 }
 
-std::span<const RegisterId> LinuxX64ABI::get_fp_allocatable_registers() const noexcept
+std::span<const RegisterId> LinuxX64ABI::get_scratch_fp_registers() const noexcept 
 {
-    return linuxx64_fp_allocatable;
+    return linuxx64_fp_scratch;
+}
+
+std::span<const RegisterId> LinuxX64ABI::get_allocatable_caller_saved_fp_registers() const noexcept 
+{
+    return linuxx64_fp_allocatable_caller_saved;
 }
 
 std::span<const RegisterId> LinuxX64ABI::get_caller_saved_gp_registers() const noexcept
@@ -520,9 +521,14 @@ std::span<const RegisterId> AppleARM64ABI::get_gp_allocatable_registers() const 
     return arm64_gp_allocatable;
 }
 
-std::span<const RegisterId> AppleARM64ABI::get_fp_allocatable_registers() const noexcept
+std::span<const RegisterId> AppleARM64ABI::get_scratch_fp_registers() const noexcept 
 {
-    return arm64_fp_allocatable;
+    return arm64_fp_scratch;
+}
+
+std::span<const RegisterId> AppleARM64ABI::get_allocatable_caller_saved_fp_registers() const noexcept 
+{
+    return arm64_fp_allocatable_caller_saved;
 }
 
 std::span<const RegisterId> AppleARM64ABI::get_caller_saved_gp_registers() const noexcept
@@ -617,7 +623,12 @@ std::span<const RegisterId> NvPTXABI::get_gp_allocatable_registers() const noexc
     return {};
 }
 
-std::span<const RegisterId> NvPTXABI::get_fp_allocatable_registers() const noexcept
+std::span<const RegisterId> NvPTXABI::get_scratch_fp_registers() const noexcept
+{
+    return {};
+}
+
+std::span<const RegisterId> NvPTXABI::get_allocatable_caller_saved_fp_registers() const noexcept
 {
     return {};
 }

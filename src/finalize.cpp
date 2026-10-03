@@ -43,8 +43,9 @@ bool finalize_mir(const MIRFunc& in,
     const FrameInfo frame = compute_frame(ra, abi, type);
 
     const auto volatile_all = abi->get_caller_saved_fp_registers();
-    const std::uint32_t scratch0 = volatile_all[volatile_all.size() - 2];
-    const std::uint32_t scratch1 = volatile_all[volatile_all.size() - 1];
+    const auto scratch_regs = abi->get_scratch_fp_registers();
+    const std::uint32_t scratch0 = scratch_regs[0];
+    const std::uint32_t scratch1 = scratch_regs[1];
 
     // No vregs should be left after finalization
     out.num_fp_vregs = 0;
@@ -140,8 +141,7 @@ bool finalize_mir(const MIRFunc& in,
                         it's holding a spilled def -- use scratch1 when
                         the def was spilled and this is the 2nd+ operand)
                     */
-                    const std::uint32_t scratch =
-                        (has_def_spill && num_reloads > 0) ? scratch1 : scratch0;
+                    const std::uint32_t scratch = num_reloads > 0 ? scratch0 : scratch1;
 
                     rewritten.operands[o] =
                         MIROperand::phys(scratch, MIROperand::Flags::Use);
