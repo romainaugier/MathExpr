@@ -273,11 +273,8 @@ static void test_alignment()
     TEST_CHECK(g_num_ctor == g_num_dtor, "Constructor/destructor count mismatch");
 }
 
-int main(int argc, char** argv)
+int main(void)
 {
-    MATHEXPR_UNUSED(argc);
-    MATHEXPR_UNUSED(argv);
-
     mathexpr::set_log_level(mathexpr::LogLevel::Info);
     mathexpr::log_info("Starting slab test");
 

@@ -590,11 +590,8 @@ static void test_manual_iteration()
     TEST_CHECK(num_iters == values.size(), "Manual iteration visited the wrong count");
 }
 
-int main(int argc, char** argv)
+int main(void)
 {
-    (void)argc;
-    (void)argv;
-
     mathexpr::set_log_level(mathexpr::LogLevel::Info);
     mathexpr::log_info("Starting enumerate test");
 

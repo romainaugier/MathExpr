@@ -7,7 +7,7 @@
 
 #include "../utils.hpp"
 
-int main(int argc, char** argv)
+int main(void)
 {
     mathexpr::set_log_level(mathexpr::LogLevel::Debug);
     mathexpr::log_info("Starting negate lit test");
