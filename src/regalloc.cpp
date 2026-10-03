@@ -54,6 +54,10 @@ bool RegAllocator::allocate(const MIRFunc& func,
         intervals[v].spans_call = false;
     }
 
+    // Rematerializable locations
+    std::pmr::vector<bool> rematerializable(num_vregs, false, std::addressof(pool));
+    out.remat_source.resize(num_vregs);
+
     // Find call instructions
     std::pmr::vector<std::uint32_t> call_points{std::addressof(pool)};
 
@@ -89,6 +93,15 @@ bool RegAllocator::allocate(const MIRFunc& func,
             {
                 iv.end = std::max(iv.end, i);
             }
+        }
+
+        if(instr.op == MIROp::Load &&
+           instr.operands[0].type == MIROperandType::VReg &&
+           instr.operands[1].type == MIROperandType::Memory &&
+           instr.operands[1].mem.base != MIRMemClass::Stack)
+        {
+            rematerializable[instr.operands[0].vreg.id] = true;
+            out.remat_source[instr.operands[0].vreg.id] = instr.operands[1];
         }
     }
 
@@ -137,7 +150,7 @@ bool RegAllocator::allocate(const MIRFunc& func,
                 continue;
             }
 
-            if(it->loc.is_reg)
+            if(it->loc.is_reg())
                 reg_free.set(it->loc.value);
             else
                 free_stack_slots.push_back(it->loc.value);
@@ -156,6 +169,14 @@ bool RegAllocator::allocate(const MIRFunc& func,
         }
 
         return out.num_spill_slots++;
+    };
+
+    auto spill_location = [&](std::uint32_t vreg) noexcept -> PhysLocation
+    {
+        if(rematerializable[vreg])
+            return PhysLocation::remat();
+
+        return PhysLocation::stack(alloc_stack_slot());
     };
 
     auto blocked = [&](std::uint32_t r, const LiveInterval& iv)
@@ -226,15 +247,29 @@ bool RegAllocator::allocate(const MIRFunc& func,
             continue;
         }
 
-        // No register is available so we spill the interval that ends last (the current one, or one of the active ones).
-        auto victim = std::max_element(active.begin(), active.end(), [](const ActiveInterval& a, const ActiveInterval& b) { 
-            return a.end < b.end;
-        });
+        // Poletto-Sarkar 
+
+        auto victim = active.end();
+
+        for(auto it = active.begin(); it != active.end(); ++it)
+        {
+            if(!it->loc.is_reg())
+                continue;
+
+            if(iv.spans_call && std::ranges::find(callee_saved_regs, it->loc.value) == callee_saved_regs.end())
+                continue;
+
+            if(blocked(it->loc.value, iv))
+                continue;
+
+            if(victim == active.end() || it->end > victim->end)
+                victim = it;
+        }
 
         if(victim != active.end() && victim->end > iv.end)
         {
             // Steal the victim's register if it has one that fits our constraints otherwise we just take a stack slot ourselves
-            const bool victim_reg_ok = victim->loc.is_reg && 
+            const bool victim_reg_ok = victim->loc.is_reg() && 
                                        (!iv.spans_call ||
                                         std::find(callee_saved_regs.begin(),
                                                   callee_saved_regs.end(),
@@ -245,7 +280,7 @@ bool RegAllocator::allocate(const MIRFunc& func,
             {
                 const PhysLocation stolen = victim->loc;
 
-                victim->loc = PhysLocation::stack(alloc_stack_slot());
+                victim->loc = spill_location(victim->vreg);
                 out.locations[victim->vreg] = victim->loc;
 
                 out.locations[iv.vreg] = stolen;
@@ -253,13 +288,13 @@ bool RegAllocator::allocate(const MIRFunc& func,
             }
             else
             {
-                out.locations[iv.vreg] = PhysLocation::stack(alloc_stack_slot());
+                out.locations[iv.vreg] = spill_location(iv.vreg);;
                 active.push_back({ iv.vreg, iv.end, out.locations[iv.vreg] });
             }
         }
         else
         {
-            out.locations[iv.vreg] = PhysLocation::stack(alloc_stack_slot());
+            out.locations[iv.vreg] = spill_location(iv.vreg);
             active.push_back({ iv.vreg, iv.end, out.locations[iv.vreg] });
         }
     }

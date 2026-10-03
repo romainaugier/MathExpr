@@ -89,6 +89,8 @@ bool finalize_mir(const MIRFunc& in,
         // We collect the reloads to insert before this instruction, and the spill store to insert after
         std::array<std::uint32_t, MIRInstr::MAX_OPERANDS> reload_phys{};
         std::array<std::int32_t, MIRInstr::MAX_OPERANDS> reload_slot{};
+        std::array<MIROperand, MIRInstr::MAX_OPERANDS> reload_mem{};
+        bool drop_instr = false;
 
         std::uint32_t num_reloads = 0;
 
@@ -110,7 +112,13 @@ bool finalize_mir(const MIRFunc& in,
 
             if(op.flags & MIROperand::Flags::Def)
             {
-                if(loc.is_reg)
+                if(loc.kind == PhysLocation::Kind::Remat)
+                {
+                    drop_instr = true;
+                    break;
+                }
+
+                if(loc.is_reg())
                 {
                     rewritten.operands[o] = MIROperand::phys(loc.value, MIROperand::Flags::Def);
                 }
@@ -120,8 +128,7 @@ bool finalize_mir(const MIRFunc& in,
                         def to a slot: compute into scratch0, then
                         store to the slot after the instruction
                     */
-                    rewritten.operands[o] =
-                        MIROperand::phys(scratch0, MIROperand::Flags::Def);
+                    rewritten.operands[o] = MIROperand::phys(scratch0, MIROperand::Flags::Def);
                     has_def_spill = true;
                     def_phys = scratch0;
                     def_slot = slot_offset(loc.value);
@@ -129,29 +136,28 @@ bool finalize_mir(const MIRFunc& in,
             }
             else /* Use */
             {
-                if(loc.is_reg)
+                if(loc.is_reg())
                 {
-                    rewritten.operands[o] =
-                        MIROperand::phys(loc.value, MIROperand::Flags::Use);
+                    rewritten.operands[o] = MIROperand::phys(loc.value, MIROperand::Flags::Use);
                 }
                 else
                 {
-                    /*
-                        reload into a scratch reg (never scratch0 while
-                        it's holding a spilled def -- use scratch1 when
-                        the def was spilled and this is the 2nd+ operand)
-                    */
-                    const std::uint32_t scratch = num_reloads > 0 ? scratch0 : scratch1;
+                    const std::uint32_t scratch = num_reloads == 0 ? scratch0 : scratch1;
 
-                    rewritten.operands[o] =
-                        MIROperand::phys(scratch, MIROperand::Flags::Use);
+                    rewritten.operands[o] = MIROperand::phys(scratch, MIROperand::Flags::Use);
 
                     reload_phys[num_reloads] = scratch;
-                    reload_slot[num_reloads] = slot_offset(loc.value);
+                    reload_mem[num_reloads] = loc.kind == PhysLocation::Kind::Remat ? 
+                                              ra.remat_source[op.vreg.id] :
+                                              MIROperand::memory(MIRMemClass::Stack, slot_offset(loc.value));
+
                     ++num_reloads;
                 }
             }
         }
+
+        if(drop_instr)
+            continue;
 
         /* reloads first */
         for(std::uint32_t r = 0; r < num_reloads; ++r)
@@ -159,7 +165,7 @@ bool finalize_mir(const MIRFunc& in,
             out.instructions.emplace_back(MIROp::Load,
                 std::initializer_list<MIROperand>{
                     MIROperand::phys(reload_phys[r], MIROperand::Flags::Def),
-                    MIROperand::memory(MIRMemClass::Stack, reload_slot[r]),
+                    reload_mem[r],
                 });
         }
 
@@ -197,6 +203,8 @@ bool finalize_mir(const MIRFunc& in,
     }
 
     out.instructions.emplace_back(MIROp::Ret, std::initializer_list<MIROperand>{});
+
+    MATHEXPR_ASSERT(out.num_fp_vregs == 0, "Some instruction(s) still have a VReg operand");
 
     return true;
 }
