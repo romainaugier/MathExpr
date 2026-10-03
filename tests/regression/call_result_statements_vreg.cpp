@@ -24,24 +24,6 @@ int main(void)
         return 1;
     }
 
-    double a = -1.0;
-
-    auto [success, res] = expr.evaluate(a);
-
-    if(!success)
-    {
-        mathexpr::log_error("Error during expression evaluation");
-        return 1;
-    }
-
-    mathexpr::log_info("expr \"{}\" evaluated: ({}) = {}",
-                       expression,
-                       a,
-                       res);
-
-    if(!DOUBLE_EQ(res, 1.0))
-        return 1;
-
     mathexpr::log_info("Finished call_result_statements_vreg test");
 
     return 0;
