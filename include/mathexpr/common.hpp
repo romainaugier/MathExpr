@@ -152,11 +152,11 @@
 
 #define MATHEXPR_NON_COPYABLE(__class__)                                                           \
     __class__(const __class__&) = delete;                                                          \
-    const __class__& operator=(const __class__&) = delete;
+    const __class__& operator=(const __class__&) = delete
 
 #define MATHEXPR_NON_MOVABLE(__class__)                                                            \
     __class__(__class__&&) = delete;                                                               \
-    const __class__& operator=(__class__&&) = delete;
+    const __class__& operator=(__class__&&) = delete
 
 #define MATHEXPR_UNUSED(expr) (void)(expr)
 
