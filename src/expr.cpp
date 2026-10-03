@@ -159,7 +159,7 @@ bool Expr::compile(ExprPrintFlags debug_flags) noexcept
     {
         auto elapsed = std::chrono::duration_cast<std::chrono::duration<double, std::milli>>(end_time - start_time).count();
 
-        log_info("Time taken to compile expression: {} {} ms", this->_expr, elapsed);
+        log_info("Time taken to compile expression \"{}\": {} ms", this->_expr, elapsed);
     }
 
     return false;
