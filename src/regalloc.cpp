@@ -152,27 +152,28 @@ bool RegAllocator::allocate(const MIRFunc& func,
         return out.num_spill_slots++;
     };
 
+    auto blocked = [&](std::uint32_t r, const LiveInterval& iv)
+    {
+        for(const FixedInterval& f : fixed)
+            if(f.phys == r && f.pos >= iv.start && f.pos < iv.end)
+                return true;
+
+        return false;
+    };
+
     auto try_alloc_reg = [&](std::span<const std::uint32_t> regs,
+                             const LiveInterval& iv,
                              std::uint32_t& out_reg) noexcept -> bool
     {
         for(const std::uint32_t r : regs)
         {
-            if(r < MAX_FP_REGS && reg_free.test(r))
+            if(r < MAX_FP_REGS && reg_free.test(r) && !blocked(r, iv))
             {
                 reg_free.reset(r);
                 out_reg = r;
                 return true;
             }
         }
-
-        return false;
-    };
-
-    auto blocked = [&](std::uint32_t r, std::uint32_t start, std::uint32_t end)
-    {
-        for(const FixedInterval& f : fixed)
-            if(f.phys == r && f.pos >= start && f.pos < end)
-                return true;
 
         return false;
     };
@@ -191,24 +192,21 @@ bool RegAllocator::allocate(const MIRFunc& func,
         {
             // Interval is live across a call: volatile registers are clobbered, only callee-saved ones can hold it
             // If none is free, spill (it's cheaper than save/restore around the call)
-            if(try_alloc_reg(callee_saved_regs, reg))
+            if(try_alloc_reg(callee_saved_regs, iv, reg))
             {
                 callee_saved_used.set(reg);
                 allocated = true;
             }
-
-            if(blocked(reg, iv.start, iv.end))
-                continue;
         }
         else
         {
             // No call in the interval: prefer volatile registers so we don't pay prologue/epilogue saves,
             // fall back to callee-saved, then spill
-            if(try_alloc_reg(volatile_regs, reg))
+            if(try_alloc_reg(volatile_regs, iv, reg))
             {
                 allocated = true;
             }
-            else if(try_alloc_reg(callee_saved_regs, reg))
+            else if(try_alloc_reg(callee_saved_regs, iv, reg))
             {
                 callee_saved_used.set(reg);
                 allocated = true;
