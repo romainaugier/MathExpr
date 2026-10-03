@@ -56,7 +56,8 @@ protected:
     static bool emit_call(MIRFunc& func,
                           const SSAStmtFunctionOp* call,
                           std::span<const std::uint32_t> arg_vregs,
-                          const PlatformABI* abi) noexcept
+                          const PlatformABI* abi,
+                          const std::uint32_t dst) noexcept
     {
         const auto arg_regs = abi->get_call_args_fp_registers();
 
@@ -85,9 +86,6 @@ protected:
         }
 
         func.instructions.emplace_back(MIROp::Call, ops.begin(), ops.begin() + call->get_arguments().size() + 1);
-
-        // Call result comes back in the return register
-        const std::uint32_t dst = func.create_fp_vreg();
 
         func.instructions.emplace_back(MIROp::Move,
                                        std::initializer_list<MIROperand>{

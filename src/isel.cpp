@@ -15,7 +15,7 @@ bool ISel::lower_ssa_to_mir(const SSA& ssa,
                             ScalarType st,
                             MIRFunc& out) const noexcept
 {
-    /* stmt -> vreg mapping */
+    // stmt -> vreg mapping
     std::unordered_map<const SSAStmt*, std::uint32_t> vregs;
     vregs.reserve(ssa.get_statements().size());
 
@@ -129,7 +129,9 @@ bool ISel::lower_ssa_to_mir(const SSA& ssa,
                 for(const SSAStmt* arg : funcop->get_arguments())
                     arg_vregs.emplace_back(vreg_of(arg));
 
-                if(!ISel::emit_call(out, funcop, arg_vregs, abi))
+                const std::uint32_t dst = vreg_of(funcop);
+
+                if(!ISel::emit_call(out, funcop, arg_vregs, abi, dst))
                     return false;
 
                 const libmaths::FunctionId func_id = libmaths::get_function_id(funcop->get_name());
