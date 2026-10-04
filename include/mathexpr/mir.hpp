@@ -12,7 +12,7 @@
 #include "mathexpr/utils/enumerate.hpp"
 #include "mathexpr/libmaths.hpp"
 
-#include <string>
+#include <cstring>
 #include <span>
 #include <memory_resource>
 
@@ -105,6 +105,11 @@ struct MIROperand
         struct { MIRMemClass base; std::int32_t offset; } mem;
         libmaths::FunctionId func_id;
     };
+
+    bool operator==(const MIROperand& other) const noexcept 
+    {
+        return std::memcmp(this, std::addressof(other), sizeof(MIROperand));
+    }
 
     static MIROperand vreg_def(std::uint32_t id) noexcept
     {

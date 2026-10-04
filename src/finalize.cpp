@@ -112,6 +112,7 @@ bool finalize_mir(const MIRFunc& in,
 
             if(op.flags & MIROperand::Flags::Def)
             {
+                // Memory can be rematerialized later (variable/literal)
                 if(loc.kind == PhysLocation::Kind::Remat)
                 {
                     drop_instr = true;
@@ -157,6 +158,11 @@ bool finalize_mir(const MIRFunc& in,
         }
 
         if(drop_instr)
+            continue;
+
+        // Drop self move
+        if(instr.op == MIROp::Move && 
+           instr.operands[0] == instr.operands[1])
             continue;
 
         /* reloads first */
